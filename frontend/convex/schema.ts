@@ -9,8 +9,16 @@ export default defineSchema({
     role: v.union(v.literal("admin"), v.literal("manager"), v.literal("engineer")),
   }).index("by_github_id", ["github_id"]),
 
+  repositories: defineTable({
+    name: v.string(),
+    owner: v.string(), // The GitHub user or organization
+    is_active: v.boolean(), // Is MergePilot enabled for this repo?
+    github_repo_id: v.optional(v.string()),
+  }),
+
   pull_requests: defineTable({
     github_pr_id: v.string(),
+    repository_id: v.id("repositories"),
     repo_name: v.string(),
     title: v.string(),
     author: v.string(),

@@ -31,8 +31,22 @@ export const seedMockData = mutation({
     const existing = await ctx.db.query("pull_requests").collect();
     if (existing.length > 0) return;
 
+    let repo = await ctx.db.query("repositories").filter(q => q.eq(q.field("name"), "MergeMasterAI")).first();
+    let repoId;
+    if (repo) {
+      repoId = repo._id;
+    } else {
+      repoId = await ctx.db.insert("repositories", {
+        name: "MergeMasterAI",
+        owner: "flore",
+        is_active: true,
+        github_repo_id: "repo_101",
+      });
+    }
+
     await ctx.db.insert("pull_requests", {
       github_pr_id: "101",
+      repository_id: repoId,
       repo_name: "MergeMasterAI",
       title: "feat: implement login page",
       author: "alice_dev",
@@ -44,6 +58,7 @@ export const seedMockData = mutation({
 
     await ctx.db.insert("pull_requests", {
       github_pr_id: "102",
+      repository_id: repoId,
       repo_name: "MergeMasterAI",
       title: "fix: update db schema for users",
       author: "bob_engineer",
@@ -55,6 +70,7 @@ export const seedMockData = mutation({
     
     await ctx.db.insert("pull_requests", {
       github_pr_id: "103",
+      repository_id: repoId,
       repo_name: "MergeMasterAI",
       title: "docs: fix typo in README",
       author: "charlie_writer",
