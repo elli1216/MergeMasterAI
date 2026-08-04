@@ -72,7 +72,7 @@ function LandingPage({ onSignIn, onSignUp }: { onSignIn: () => void, onSignUp: (
             The Autonomous <br /><span className="font-serif italic text-zinc-500">Deployment Gatekeeper</span>
           </h1>
           <p className="text-zinc-400 font-mono text-sm max-w-2xl mx-auto leading-relaxed mt-8">
-            MergePilot AI analyzes your PRs, routes human reviewers, generates security risk scores, and autonomously pushes remediations. Keep your mainline pristine.
+            MergeMaster AI analyzes your PRs, routes human reviewers, generates security risk scores, and autonomously pushes remediations. Keep your mainline pristine.
           </p>
         </div>
 
@@ -116,7 +116,7 @@ function Dashboard() {
             </div>
             <div>
               <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight text-white uppercase tracking-widest">Command Center</h1>
-              <p className="text-zinc-500 font-mono text-xs md:text-sm mt-1 uppercase">MergePilot AI // Real-time Dashboard</p>
+              <p className="text-zinc-500 font-mono text-xs md:text-sm mt-1 uppercase">MergeMaster AI // Real-time Dashboard</p>
             </div>
           </div>
           <div className="flex flex-wrap gap-4 items-center w-full md:w-auto">

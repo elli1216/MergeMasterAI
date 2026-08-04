@@ -1,33 +1,44 @@
-import { defineSchema, defineTable } from "convex/server";
-import { v } from "convex/values";
+import { defineSchema, defineTable } from 'convex/server'
+import { v } from 'convex/values'
 
 export default defineSchema({
   users: defineTable({
     github_id: v.string(),
     name: v.string(),
     email: v.string(),
-    role: v.union(v.literal("admin"), v.literal("manager"), v.literal("engineer")),
-  }).index("by_github_id", ["github_id"]),
+    role: v.union(
+      v.literal('admin'),
+      v.literal('manager'),
+      v.literal('engineer'),
+    ),
+  }).index('by_github_id', ['github_id']),
 
   repositories: defineTable({
     name: v.string(),
     owner: v.string(), // The GitHub user or organization
-    is_active: v.boolean(), // Is MergePilot enabled for this repo?
+    is_active: v.boolean(), // Is MergeMaster enabled for this repo?
     github_repo_id: v.optional(v.string()),
   }),
 
   pull_requests: defineTable({
     github_pr_id: v.string(),
-    repository_id: v.id("repositories"),
+    repository_id: v.id('repositories'),
     repo_name: v.string(),
     title: v.string(),
     author: v.string(),
-    status: v.union(v.literal("pending"), v.literal("approved"), v.literal("blocked"), v.literal("merged"), v.literal("closed")),
+    status: v.union(
+      v.literal('pending'),
+      v.literal('approved'),
+      v.literal('blocked'),
+      v.literal('merged'),
+      v.literal('closed'),
+    ),
     risk_score: v.number(), // 0 to 100
     ai_summary: v.string(),
     updated_at: v.number(),
-  }).index("by_github_pr_id", ["github_pr_id"])
-    .index("by_status", ["status"]),
+  })
+    .index('by_github_pr_id', ['github_pr_id'])
+    .index('by_status', ['status']),
 
   routing_rules: defineTable({
     file_pattern: v.string(),
@@ -36,15 +47,15 @@ export default defineSchema({
   }),
 
   ai_decisions_log: defineTable({
-    pr_id: v.id("pull_requests"),
+    pr_id: v.id('pull_requests'),
     decision_type: v.union(
-      v.literal("block_merge"),
-      v.literal("route_reviewer"),
-      v.literal("remediate_code"),
-      v.literal("auto_approve")
+      v.literal('block_merge'),
+      v.literal('route_reviewer'),
+      v.literal('remediate_code'),
+      v.literal('auto_approve'),
     ),
     reasoning: v.string(),
-    overridden_by: v.optional(v.id("users")),
+    overridden_by: v.optional(v.id('users')),
     created_at: v.number(),
-  }).index("by_pr_id", ["pr_id"]),
-});
+  }).index('by_pr_id', ['pr_id']),
+})

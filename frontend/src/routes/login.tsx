@@ -33,7 +33,7 @@ function LoginPage() {
 
         <div className="text-center pt-4">
           <p className="text-zinc-600 font-serif italic text-xs leading-relaxed">
-            By authenticating, you agree to the MergePilot <br /> automated deployment protocols.
+            By authenticating, you agree to the MergeMaster <br /> automated deployment protocols.
           </p>
         </div>
       </div>
