@@ -29,6 +29,9 @@ importers:
       '@tanstack/react-start':
         specifier: ^1.167.41
         version: 1.168.34(esbuild@0.27.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(rolldown@1.2.2)(vite@8.2.0(esbuild@0.27.0)(jiti@2.7.0))
+      '@workos-inc/authkit-react':
+        specifier: ^0.16.2
+        version: 0.16.2(react@19.2.8)
       class-variance-authority:
         specifier: ^0.7.1
         version: 0.7.1
@@ -1198,6 +1201,14 @@ packages:
         optional: true
       babel-plugin-react-compiler:
         optional: true
+
+  '@workos-inc/authkit-js@0.20.2':
+    resolution: {integrity: sha512-EEo8VitBko7ON5shVRS4AMmgezWhWfxKKtGV7QpJMgsejKBXi0DujCFf7blR7z46z3xr3Ge55yVEMSrOMtMOzg==}
+
+  '@workos-inc/authkit-react@0.16.2':
+    resolution: {integrity: sha512-Q10bTJ3sd8zfbIlxl8KavLeHLuW7v2aJLfq+syyWsVa9VzbrBVFyr7HNxt3aAVJq1kcMfTJu1p9gSJT3Gswulg==}
+    peerDependencies:
+      react: '>=17'
 
   accepts@2.0.0:
     resolution: {integrity: sha512-5cvg6CtKwfgdmVqY1WIiXKc3Q1bkRqGLi+2W/6ao+6Y7gu/RCwRuAhGEzh5B4KlszSuTLgZYuqFqo5bImjNKng==}
@@ -4072,6 +4083,13 @@ snapshots:
     dependencies:
       '@rolldown/pluginutils': 1.0.1
       vite: 8.2.0(esbuild@0.27.0)(jiti@2.7.0)
+
+  '@workos-inc/authkit-js@0.20.2': {}
+
+  '@workos-inc/authkit-react@0.16.2(react@19.2.8)':
+    dependencies:
+      '@workos-inc/authkit-js': 0.20.2
+      react: 19.2.8
 
   accepts@2.0.0:
     dependencies:

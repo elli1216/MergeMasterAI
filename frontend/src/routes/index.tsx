@@ -3,15 +3,91 @@ import { useMutation } from 'convex/react'
 import { useSuspenseQuery } from '@tanstack/react-query'
 import { convexQuery } from '@convex-dev/react-query'
 import { api } from '../../convex/_generated/api'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '~/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle } from '~/components/ui/card'
 import { Badge } from '~/components/ui/badge'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '~/components/ui/table'
 import { Button } from '~/components/ui/button'
 import { Shield, GitPullRequest, Settings, ShieldAlert, ShieldCheck, Activity } from 'lucide-react'
+import { useAuth } from '@workos-inc/authkit-react'
+import { useEffect } from 'react'
 
 export const Route = createFileRoute('/')({
-  component: Dashboard,
+  component: IndexPage,
 })
+
+function IndexPage() {
+  const { user, isLoading, signIn, signUp } = useAuth()
+  const syncUser = useMutation(api.users.syncUser)
+
+  useEffect(() => {
+    if (user) {
+      // 1. Persist the session to local storage as requested
+      localStorage.setItem('workos_user', JSON.stringify(user))
+
+      // 2. Sync new signups to the Convex database
+      syncUser({
+        github_id: user.id,
+        name: user.firstName ? `${user.firstName} ${user.lastName || ''}`.trim() : 'Anonymous Engineer',
+        email: user.email ?? 'no-email-provided',
+      }).catch(console.error)
+    } else if (!isLoading) {
+      // Clean up local storage if logged out
+      localStorage.removeItem('workos_user')
+    }
+  }, [user, isLoading, syncUser])
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-black flex items-center justify-center">
+        <div className="text-white font-mono uppercase tracking-widest text-xs animate-pulse">Loading System...</div>
+      </div>
+    )
+  }
+
+  if (!user) {
+    return <LandingPage onSignIn={() => signIn()} onSignUp={() => signUp()} />
+  }
+
+  return <Dashboard />
+}
+
+function LandingPage({ onSignIn, onSignUp }: { onSignIn: () => void, onSignUp: () => void }) {
+  return (
+    <div className="min-h-screen bg-black text-zinc-50 flex flex-col font-sans selection:bg-white selection:text-black">
+      <header className="flex items-center justify-between p-8 border-b border-zinc-900">
+        <div className="flex items-center gap-4">
+          <div className="font-extrabold tracking-tight text-white uppercase tracking-widest text-xl">MergeMaster</div>
+        </div>
+        <div className="flex gap-4">
+          <button onClick={onSignIn} className="border border-zinc-700 px-6 py-2 text-xs font-mono uppercase tracking-widest hover:bg-white hover:text-black transition-all">
+            System Login
+          </button>
+        </div>
+      </header>
+
+      <main className="flex-1 flex flex-col items-center justify-center text-center p-8 max-w-4xl mx-auto space-y-4">
+        <img src="/mergemaster.png" alt="Main Logo" className='size-30 rounded-full' />
+        <div className="space-y-6">
+          <h1 className="text-5xl md:text-7xl font-light tracking-tighter text-white">
+            The Autonomous <br /><span className="font-serif italic text-zinc-500">Deployment Gatekeeper</span>
+          </h1>
+          <p className="text-zinc-400 font-mono text-sm max-w-2xl mx-auto leading-relaxed mt-8">
+            MergePilot AI analyzes your PRs, routes human reviewers, generates security risk scores, and autonomously pushes remediations. Keep your mainline pristine.
+          </p>
+        </div>
+
+        <div className="flex gap-6 mt-12">
+          <button onClick={onSignUp} className="bg-white text-black px-8 py-4 text-sm font-mono uppercase tracking-widest hover:bg-zinc-200 transition-all">
+            Initialize Setup
+          </button>
+          <a href="https://github.com/elli1216/MergeMasterAI" target="_blank" rel="noreferrer" className="border border-zinc-700 px-8 py-4 text-sm font-mono uppercase tracking-widest hover:bg-zinc-900 transition-all text-zinc-300">
+            View Protocol
+          </a>
+        </div>
+      </main>
+    </div>
+  )
+}
 
 function Dashboard() {
   const { data: prs } = useSuspenseQuery(convexQuery(api.pullRequests.getActivePRs, {}))
@@ -28,7 +104,7 @@ function Dashboard() {
   return (
     <div className="min-h-screen bg-black text-zinc-50 p-8 font-sans selection:bg-white selection:text-black">
       <div className="max-w-6xl mx-auto space-y-12">
-        
+
         {/* Header Section */}
         <header className="flex items-center justify-between border-b border-zinc-800 pb-8">
           <div className="flex items-center gap-4">
@@ -98,7 +174,7 @@ function Dashboard() {
               <p className="text-zinc-500 font-mono text-sm">Real-time risk scoring and routing</p>
             </div>
           </div>
-          
+
           <Card className="bg-zinc-950 border-zinc-800 rounded-none shadow-none">
             <CardContent className="p-0">
               {prs && prs.length > 0 ? (
@@ -125,8 +201,8 @@ function Dashboard() {
                           <TableCell>
                             <div className="flex items-center gap-3">
                               <div className="w-full bg-zinc-800 h-1 max-w-[100px]">
-                                <div 
-                                  className="h-1 bg-white" 
+                                <div
+                                  className="h-1 bg-white"
                                   style={{ width: `${Math.max(pr.risk_score, 5)}%` }}
                                 />
                               </div>
@@ -134,8 +210,8 @@ function Dashboard() {
                             </div>
                           </TableCell>
                           <TableCell>
-                            <Badge 
-                              variant="outline" 
+                            <Badge
+                              variant="outline"
                               className={`rounded-none font-mono text-xs uppercase tracking-wider border
                                 ${pr.status === 'blocked' ? 'border-white text-black bg-white' : ''}
                                 ${pr.status === 'approved' ? 'border-zinc-500 text-zinc-300 bg-transparent' : ''}
@@ -149,16 +225,16 @@ function Dashboard() {
                             "{pr.ai_summary}"
                           </TableCell>
                           <TableCell className="text-right space-x-2">
-                            <Button 
-                              variant="ghost" 
+                            <Button
+                              variant="ghost"
                               size="sm"
                               onClick={() => handleOverride(pr._id, 'approved')}
                               className="h-8 text-xs font-mono uppercase tracking-wider text-zinc-400 hover:text-black hover:bg-white rounded-none transition-all"
                             >
                               Approve
                             </Button>
-                            <Button 
-                              variant="ghost" 
+                            <Button
+                              variant="ghost"
                               size="sm"
                               onClick={() => handleOverride(pr._id, 'blocked')}
                               className="h-8 text-xs font-mono uppercase tracking-wider text-zinc-400 hover:text-white hover:bg-zinc-800 rounded-none transition-all"

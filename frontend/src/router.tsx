@@ -3,6 +3,7 @@ import { QueryClient } from '@tanstack/react-query'
 import { routerWithQueryClient } from '@tanstack/react-router-with-query'
 import { ConvexQueryClient } from '@convex-dev/react-query'
 import { ConvexProvider } from 'convex/react'
+import { AuthKitProvider } from '@workos-inc/authkit-react'
 import { routeTree } from './routeTree.gen'
 
 export function getRouter() {
@@ -33,9 +34,14 @@ export function getRouter() {
       defaultErrorComponent: (err) => <p>{err.error.stack}</p>,
       defaultNotFoundComponent: () => <p>not found</p>,
       Wrap: ({ children }) => (
-        <ConvexProvider client={convexQueryClient.convexClient}>
-          {children}
-        </ConvexProvider>
+        <AuthKitProvider 
+          clientId={(import.meta as any).env.VITE_WORKOS_CLIENT_ID || 'client_placeholder'}
+          redirectUri={typeof window !== 'undefined' ? `${window.location.origin}/callback` : 'http://localhost:3000/callback'}
+        >
+          <ConvexProvider client={convexQueryClient.convexClient}>
+            {children}
+          </ConvexProvider>
+        </AuthKitProvider>
       ),
     }),
     queryClient,
