@@ -22,7 +22,7 @@ export default defineSchema({
 
   pull_requests: defineTable({
     github_pr_id: v.string(),
-    repository_id: v.id('repositories'),
+    repository_id: v.optional(v.id('repositories')),
     repo_name: v.string(),
     title: v.string(),
     author: v.string(),

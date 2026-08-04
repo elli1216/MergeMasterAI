@@ -20,7 +20,7 @@ export const addNumber = mutation({
   args: {
     value: v.number(),
   },
-  handler: async (ctx, args) => {
+  handler: async (_ctx, args) => {
     console.log('Mock add number:', args.value)
   },
 })
