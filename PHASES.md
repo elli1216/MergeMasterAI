@@ -1,4 +1,4 @@
-# MergePilot AI: Architecture and Implementation Phases
+# MergeMaster AI: Architecture and Implementation Phases
 
 ## 🏗️ Architecture Plan
 
@@ -23,6 +23,7 @@ The application follows a modern decoupled architecture emphasizing real-time up
 - **Development Partner:** IBM Bob for boilerplate, nodes, and GitHub API logic generation.
 
 ### 4. Convex Database Schema (Real-time State)
+
 To support the real-time DevOps Command Center and secure user access, the following core tables (documents) will be defined in the Convex schema:
 
 - **`users`**: Engineering managers and developers logging into the dashboard (via GitHub OAuth).
@@ -46,7 +47,7 @@ To support the real-time DevOps Command Center and secure user access, the follo
   - `reviewer_role` (String) - e.g., "Lead Backend Engineer", "UI/UX Lead".
   - `auto_approve` (Boolean) - Whether changes to this pattern can be auto-approved (e.g., minor docs).
 
-- **`ai_decisions_log`**: Audit trail for actions taken by MergePilot.
+- **`ai_decisions_log`**: Audit trail for actions taken by MergeMaster.
   - `pr_id` (Id("pull_requests")) - Reference to the PR.
   - `decision_type` (String) - e.g., "block_merge", "route_reviewer", "remediate_code".
   - `reasoning` (String) - The LLM's justification for the action.

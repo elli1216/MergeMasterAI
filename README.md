@@ -1,10 +1,10 @@
-# 🚀 MergePilot AI
+# 🚀 MergeMaster AI
 
 **An autonomous AI co-worker that orchestrates GitHub PR workflows, remediates code, and automates deployment decisions.**
 
 Built for the **IBM AI Builders Challenge (Wild Card Category)**.
 
-MergePilot AI goes beyond traditional "AI code reviewers." Instead of passively leaving comments, it acts as an active engineering collaborator. It reads pull requests, autonomously pushes code fixes for vulnerabilities, intelligently routes mandatory human reviewers based on file types, and acts as a strict deployment gatekeeper using risk-confidence scoring.
+MergeMaster AI goes beyond traditional "AI code reviewers." Instead of passively leaving comments, it acts as an active engineering collaborator. It reads pull requests, autonomously pushes code fixes for vulnerabilities, intelligently routes mandatory human reviewers based on file types, and acts as a strict deployment gatekeeper using risk-confidence scoring.
 
 ---
 
@@ -13,12 +13,12 @@ MergePilot AI goes beyond traditional "AI code reviewers." Instead of passively 
 ### 1. Autonomous Code Remediation 🛠️
 
 - **The Problem:** Standard AI tools just tell you what's wrong, forcing the developer to switch contexts and write the fix.
-- **The Solution:** When MergePilot detects a security flaw, anti-pattern, or optimization, it doesn't just comment. The IBM Granite agent generates the corrected code and autonomously pushes a new commit directly to the PR branch.
+- **The Solution:** When MergeMaster detects a security flaw, anti-pattern, or optimization, it doesn't just comment. The IBM Granite agent generates the corrected code and autonomously pushes a new commit directly to the PR branch.
 
 ### 2. Smart Reviewer Routing 🚦
 
 - **The Problem:** Tagging the entire team on every PR creates alert fatigue and slows down development.
-- **The Solution:** MergePilot analyzes the Git diff to orchestrate the team.
+- **The Solution:** MergeMaster analyzes the Git diff to orchestrate the team.
   - Touches `schema.prisma`? It auto-assigns the Lead Backend Engineer.
   - Touches `globals.css`? It assigns the UI/UX Lead.
   - Minor markdown/docs typo? It auto-approves the PR to save human time.
@@ -26,7 +26,7 @@ MergePilot AI goes beyond traditional "AI code reviewers." Instead of passively 
 ### 3. Release Decision Engine & Risk Scoring 🛡️
 
 - **The Problem:** Merging code is stressful, and human reviewers can miss subtle architectural regressions.
-- **The Solution:** Before enabling the merge button, the AI generates a **Risk Confidence Score** (0-100%). If the score is >95%, the PR is cleared. If a critical flaw is detected, MergePilot physically blocks the GitHub merge state and logs a "Blocker" ticket in the project dashboard.
+- **The Solution:** Before enabling the merge button, the AI generates a **Risk Confidence Score** (0-100%). If the score is >95%, the PR is cleared. If a critical flaw is detected, MergeMaster physically blocks the GitHub merge state and logs a "Blocker" ticket in the project dashboard.
 
 ### 4. The DevOps Command Center (Dashboard) 📊
 
