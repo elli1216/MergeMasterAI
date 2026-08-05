@@ -49,6 +49,7 @@ export default defineSchema({
     updated_at: v.number(),
   })
     .index('by_github_pr_id', ['github_pr_id'])
+    .index('by_repo_name_and_github_pr_id', ['repo_name', 'github_pr_id'])
     .index('by_status', ['status']),
 
   routing_rules: defineTable({

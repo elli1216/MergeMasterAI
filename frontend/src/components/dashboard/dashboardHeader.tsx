@@ -1,4 +1,4 @@
-import { LogOut, RefreshCw, Shield, User } from 'lucide-react'
+import { LogOut, RefreshCw, User } from 'lucide-react'
 import { Button } from '~/components/ui/button'
 
 type DashboardHeaderProps = {

@@ -1,8 +1,10 @@
 import os
 import hmac
 import hashlib
-from fastapi import FastAPI, Request, HTTPException
+from fastapi import FastAPI, Request, HTTPException, BackgroundTasks
 from dotenv import load_dotenv
+
+from agents.graph import run_pipeline
 
 # Load environment variables from .env
 load_dotenv()
@@ -34,7 +36,7 @@ def verify_github_signature(payload_body: bytes, signature_header: str):
         raise HTTPException(status_code=401, detail="Invalid webhook signature")
 
 @app.post("/api/webhooks/github")
-async def github_webhook(request: Request):
+async def github_webhook(request: Request, background_tasks: BackgroundTasks):
     """
     The main entrypoint for GitHub Webhooks.
     """
@@ -62,10 +64,19 @@ async def github_webhook(request: Request):
     elif event_type == "pull_request":
         # Handle PR events (opened, synchronized, closed)
         action = payload.get("action")
-        pr_number = payload.get("pull_request", {}).get("number")
+        pr = payload.get("pull_request", {})
+        pr_number = pr.get("number")
         repo_name = payload.get("repository", {}).get("full_name")
         print(f"🔄 Pull Request #{pr_number} action: {action} on {repo_name}")
-        # TODO: Trigger LangGraph Agent to analyze the PR
+        if action in ("opened", "synchronize", "reopened", "ready_for_review"):
+            # Phase 3: Kick off the LangGraph pipeline in the background
+            background_tasks.add_task(
+                run_pipeline,
+                repo_name=repo_name,
+                pr_number=pr_number,
+                title=pr.get("title", ""),
+                author=(pr.get("user") or {}).get("login", ""),
+            )
         
     return {"status": "success"}
 

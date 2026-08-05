@@ -142,7 +142,9 @@ export const upsertPullRequest = internalMutation({
     }
     const existing = await ctx.db
       .query('pull_requests')
-      .withIndex('by_github_pr_id', (q) => q.eq('github_pr_id', githubPrId))
+      .withIndex('by_repo_name_and_github_pr_id', (q) =>
+        q.eq('repo_name', repoName).eq('github_pr_id', githubPrId),
+      )
       .first()
     if (existing) {
       await ctx.db.patch('pull_requests', existing._id, data)
