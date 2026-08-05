@@ -14,7 +14,7 @@ async def _call_mutation(path: str, args: dict) -> bool:
         resp = await http_client.get_async_client().post(
             f"{config.CONVEX_URL.rstrip('/')}/api/mutation",
             json={"path": path, "args": args},
-            headers={"Authorization": f"Bearer {config.CONVEX_ADMIN_KEY}"},
+            headers={"Authorization": f"Convex {config.CONVEX_ADMIN_KEY}"},
         )
         resp.raise_for_status()
         return True
@@ -30,6 +30,7 @@ async def update_pull_request_analysis(
     status: str,
     risk_score: int,
     ai_summary: str,
+    full_review: dict | None = None,
 ) -> bool:
     ok = await _call_mutation(
         "pullRequests:updatePullRequestAnalysis",
@@ -39,6 +40,7 @@ async def update_pull_request_analysis(
             "status": status,
             "risk_score": risk_score,
             "ai_summary": ai_summary,
+            "full_review": full_review,
         },
     )
     if ok:

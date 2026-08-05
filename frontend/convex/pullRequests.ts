@@ -31,6 +31,7 @@ export const updatePullRequestAnalysis = mutation({
     status: v.union(v.literal("pending"), v.literal("approved"), v.literal("blocked"), v.literal("merged"), v.literal("closed")),
     risk_score: v.number(),
     ai_summary: v.string(),
+    full_review: v.optional(v.any()),
   },
   handler: async (ctx, args) => {
     const existing = await ctx.db
@@ -43,7 +44,27 @@ export const updatePullRequestAnalysis = mutation({
       status: args.status,
       risk_score: args.risk_score,
       ai_summary: args.ai_summary,
+      full_review: args.full_review,
       updated_at: Date.now(),
+    });
+  },
+});
+
+export const saveMarkdownReport = mutation({
+  args: {
+    github_pr_id: v.string(),
+    repo_name: v.string(),
+    markdown_report: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const existing = await ctx.db
+      .query("pull_requests")
+      .withIndex("by_repo_name_and_github_pr_id", (q) =>
+        q.eq("repo_name", args.repo_name).eq("github_pr_id", args.github_pr_id))
+      .first();
+    if (!existing) return;
+    await ctx.db.patch("pull_requests", existing._id, {
+      markdown_report: args.markdown_report,
     });
   },
 });
@@ -73,5 +94,25 @@ export const logAnalysisDecision = mutation({
       reasoning: args.reasoning,
       created_at: Date.now(),
     });
+  },
+});
+
+export const getAnalyzeHistory = query({
+  args: {},
+  handler: async (ctx) => {
+    const logs = await ctx.db.query("ai_decisions_log").order("desc").take(100);
+    const enriched = await Promise.all(
+      logs.map(async (log) => {
+        const pr = await ctx.db.get(log.pr_id);
+        return {
+          ...log,
+          pr_title: pr?.title || "Unknown PR",
+          repo_name: pr?.repo_name || "Unknown Repo",
+          github_pr_id: pr?.github_pr_id || "?",
+          full_review: pr?.full_review,
+        };
+      })
+    );
+    return enriched;
   },
 });

@@ -78,6 +78,22 @@ export const syncGitHubData = action({
         })),
       })
       commitsSynced += commits.length
+
+      const branches = (await gh(`/repos/${repo.full_name}/branches?per_page=50`)) as Array<{
+        name: string
+        commit: { sha: string }
+        protected: boolean
+      }>
+      await ctx.runMutation(internal.github.replaceBranches, {
+        repositoryId,
+        repoName: repo.full_name,
+        branches: branches.map((b) => ({
+          name: b.name,
+          sha: b.commit.sha,
+          isProtected: b.protected,
+        })),
+      })
+
       reposSynced++
       syncedRepoIds.push(repositoryId)
     }
@@ -147,7 +163,14 @@ export const upsertPullRequest = internalMutation({
       )
       .first()
     if (existing) {
-      await ctx.db.patch('pull_requests', existing._id, data)
+      await ctx.db.patch('pull_requests', existing._id, {
+        repository_id: repositoryId,
+        repo_name: repoName,
+        title,
+        author,
+        status: (status === 'merged' || status === 'closed') ? status : existing.status,
+        updated_at: Date.now(),
+      })
       return
     }
     await ctx.db.insert('pull_requests', {
@@ -191,6 +214,38 @@ export const replaceCommits = internalMutation({
   },
 })
 
+export const replaceBranches = internalMutation({
+  args: {
+    repositoryId: v.id('repositories'),
+    repoName: v.string(),
+    branches: v.array(
+      v.object({
+        name: v.string(),
+        sha: v.string(),
+        isProtected: v.boolean(),
+      }),
+    ),
+  },
+  handler: async (ctx, { repositoryId, repoName, branches }) => {
+    const existing = await ctx.db
+      .query('branches')
+      .withIndex('by_repository_id', (q) => q.eq('repository_id', repositoryId))
+      .collect()
+    for (const doc of existing) {
+      await ctx.db.delete('branches', doc._id)
+    }
+    for (const b of branches) {
+      await ctx.db.insert('branches', {
+        repository_id: repositoryId,
+        repo_name: repoName,
+        name: b.name,
+        last_commit_sha: b.sha,
+        is_protected: b.isProtected,
+      })
+    }
+  },
+})
+
 export const applyCleanup = internalMutation({
   args: { keepRepoIds: v.array(v.id('repositories')) },
   handler: async (ctx, { keepRepoIds }) => {
@@ -203,6 +258,11 @@ export const applyCleanup = internalMutation({
     for (const commit of await ctx.db.query('commits').collect()) {
       if (!keep.has(commit.repository_id)) {
         await ctx.db.delete('commits', commit._id)
+      }
+    }
+    for (const branch of await ctx.db.query('branches').collect()) {
+      if (!keep.has(branch.repository_id)) {
+        await ctx.db.delete('branches', branch._id)
       }
     }
     for (const repo of await ctx.db.query('repositories').collect()) {

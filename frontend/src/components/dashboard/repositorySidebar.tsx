@@ -3,6 +3,7 @@ import { ChevronDown, Search } from 'lucide-react'
 import type { Doc } from '../../../convex/_generated/dataModel'
 import { Button } from '~/components/ui/button'
 import { Card, CardContent } from '~/components/ui/card'
+import { Link } from '@tanstack/react-router'
 
 type RepositorySidebarProps = {
   repos: Array<Doc<'repositories'>>
@@ -52,25 +53,27 @@ export function RepositorySidebar({ repos, openPrCount }: RepositorySidebarProps
       <div className="space-y-3">
         {shownRepos.length > 0 ? (
           shownRepos.map((repo, idx) => (
-            <Card key={repo._id} className="bg-zinc-950 border-zinc-800 rounded-none shadow-none hover:border-zinc-600 transition-colors">
-              <CardContent className="p-4 flex items-center justify-between gap-3">
-                <div className="overflow-hidden">
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono text-[10px] text-zinc-600">{String(idx + 1).padStart(2, '0')}</span>
-                    <div className="text-sm font-bold text-white truncate">{repo.name}</div>
-                  </div>
-                  <div className="text-xs text-zinc-500 font-mono truncate mt-1 pl-6">{repo.owner}</div>
-                </div>
-                <div className="flex flex-col items-end gap-2">
-                  <div className={`w-2 h-2 rounded-full ${repo.is_active ? 'bg-white' : 'bg-zinc-700'}`} />
-                  {openPrCount[repo.name] ? (
-                    <span className="text-[10px] font-mono text-zinc-400 border border-zinc-800 px-1.5 py-0.5">
-                      {openPrCount[repo.name]} OPEN
-                    </span>
-                  ) : null}
-                </div>
-              </CardContent>
-            </Card>
+            <Link key={repo._id} to="/repository/$id" params={{ id: repo._id }} className="block">
+                <Card className="bg-zinc-950 border-zinc-800 rounded-none shadow-none hover:border-zinc-500 transition-colors cursor-pointer">
+                <CardContent className="p-4 flex items-center justify-between gap-3">
+                    <div className="overflow-hidden">
+                    <div className="flex items-center gap-2">
+                        <span className="font-mono text-[10px] text-zinc-600">{String(idx + 1).padStart(2, '0')}</span>
+                        <div className="text-sm font-bold text-white truncate group-hover:text-white transition-colors">{repo.name}</div>
+                    </div>
+                    <div className="text-xs text-zinc-500 font-mono truncate mt-1 pl-6">{repo.owner}</div>
+                    </div>
+                    <div className="flex flex-col items-end gap-2">
+                    <div className={`w-2 h-2 rounded-full ${repo.is_active ? 'bg-white' : 'bg-zinc-700'}`} />
+                    {openPrCount[repo.name] ? (
+                        <span className="text-[10px] font-mono text-zinc-400 border border-zinc-800 px-1.5 py-0.5 bg-zinc-900/50">
+                        {openPrCount[repo.name]} OPEN
+                        </span>
+                    ) : null}
+                    </div>
+                </CardContent>
+                </Card>
+            </Link>
           ))
         ) : (
           <div className="text-zinc-600 font-mono text-xs uppercase p-4 border border-zinc-800 border-dashed text-center">

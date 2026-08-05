@@ -37,6 +37,7 @@ async def extract_diff(state: PipelineState) -> PipelineState:
         "files": data["files"],
         "head_sha": data["head_sha"],
         "head_ref": data["head_ref"],
+        "has_merge_conflicts": data.get("mergeable") is False,
     }
     if not merged.get("title"):
         merged["title"] = data.get("title", "")
@@ -46,6 +47,15 @@ async def extract_diff(state: PipelineState) -> PipelineState:
 
 
 async def analyze_changes(state: PipelineState) -> PipelineState:
+    if state.get("has_merge_conflicts"):
+        return {
+            **state,
+            "decision": "block",
+            "risk_score": 100,
+            "findings": [],
+            "ai_summary": "Merge conflicts detected. Please resolve conflicts before AI review.",
+        }
+
     result = await analyze(
         state.get("title", ""), state.get("author", ""), state["diff"], state["files"]
     )
@@ -129,12 +139,27 @@ async def record_result(state: PipelineState) -> PipelineState:
         )
         return state
 
+    full_review = {
+        "repo_name": state.get("repo_name"),
+        "pr_number": state.get("pr_number"),
+        "status": state.get("status"),
+        "risk_score": state.get("risk_score"),
+        "decision": state.get("decision"),
+        "ai_summary": state.get("ai_summary"),
+        "reviewers": state.get("reviewers", []),
+        "findings": [f.model_dump() for f in state.get("findings", [])] if state.get("findings") else [],
+        "head_sha": state.get("head_sha"),
+        "remediation_note": state.get("remediation_note"),
+        "error": state.get("error"),
+    }
+
     await convex_client.update_pull_request_analysis(
         github_pr_id=str(state["pr_number"]),
         repo_name=state["repo_name"],
         status=state["status"],
         risk_score=state["risk_score"],
         ai_summary=state["ai_summary"],
+        full_review=full_review,
     )
 
     decision_type = (

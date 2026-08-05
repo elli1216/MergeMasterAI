@@ -13,3 +13,32 @@ export const getUserRepositories = query({
     return repos;
   },
 });
+
+export const getRepositoryDetails = query({
+  args: { repositoryId: v.id("repositories") },
+  handler: async (ctx, args) => {
+    const repo = await ctx.db.get(args.repositoryId);
+    if (!repo) {
+      throw new Error("Repository not found");
+    }
+
+    const prs = await ctx.db
+      .query("pull_requests")
+      .withIndex("by_repository_id", (q) => q.eq("repository_id", args.repositoryId))
+      .order("desc")
+      .collect();
+
+    const commits = await ctx.db
+      .query("commits")
+      .withIndex("by_repository_id", (q) => q.eq("repository_id", args.repositoryId))
+      .order("desc")
+      .take(50); // limit to recent 50 commits
+
+    const branches = await ctx.db
+      .query("branches")
+      .withIndex("by_repository_id", (q) => q.eq("repository_id", args.repositoryId))
+      .collect();
+
+    return { repo, prs, commits, branches };
+  },
+});

@@ -9,14 +9,16 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as IndexRouteImport } from './routes/index'
+import { Route as DashboardRouteImport } from './routes/_dashboard'
 import { Route as AnotherPageRouteImport } from './routes/anotherPage'
 import { Route as CallbackRouteImport } from './routes/callback'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as DashboardIndexRouteImport } from './routes/_dashboard.index'
+import { Route as DashboardRepositoriesIndexRouteImport } from './routes/_dashboard.repositories.index'
+import { Route as DashboardRepositoryIdRouteImport } from './routes/_dashboard.repository.$id'
 
-const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
+const DashboardRoute = DashboardRouteImport.update({
+  id: '/_dashboard',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AnotherPageRoute = AnotherPageRouteImport.update({
@@ -34,36 +36,79 @@ const LoginRoute = LoginRouteImport.update({
   path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
+const DashboardIndexRoute = DashboardIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => DashboardRoute,
+} as any)
+const DashboardRepositoriesIndexRoute =
+  DashboardRepositoriesIndexRouteImport.update({
+    id: '/repositories/',
+    path: '/repositories/',
+    getParentRoute: () => DashboardRoute,
+  } as any)
+const DashboardRepositoryIdRoute = DashboardRepositoryIdRouteImport.update({
+  id: '/repository/$id',
+  path: '/repository/$id',
+  getParentRoute: () => DashboardRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
-  '/': typeof IndexRoute
+  '/': typeof DashboardIndexRoute
   '/anotherPage': typeof AnotherPageRoute
   '/callback': typeof CallbackRoute
   '/login': typeof LoginRoute
+  '/repository/$id': typeof DashboardRepositoryIdRoute
+  '/repositories/': typeof DashboardRepositoriesIndexRoute
 }
 export interface FileRoutesByTo {
-  '/': typeof IndexRoute
   '/anotherPage': typeof AnotherPageRoute
   '/callback': typeof CallbackRoute
   '/login': typeof LoginRoute
+  '/': typeof DashboardIndexRoute
+  '/repository/$id': typeof DashboardRepositoryIdRoute
+  '/repositories': typeof DashboardRepositoriesIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
-  '/': typeof IndexRoute
+  '/_dashboard': typeof DashboardRouteWithChildren
   '/anotherPage': typeof AnotherPageRoute
   '/callback': typeof CallbackRoute
   '/login': typeof LoginRoute
+  '/_dashboard/': typeof DashboardIndexRoute
+  '/_dashboard/repository/$id': typeof DashboardRepositoryIdRoute
+  '/_dashboard/repositories/': typeof DashboardRepositoriesIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/anotherPage' | '/callback' | '/login'
+  fullPaths:
+    | '/'
+    | '/anotherPage'
+    | '/callback'
+    | '/login'
+    | '/repository/$id'
+    | '/repositories/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/anotherPage' | '/callback' | '/login'
-  id: '__root__' | '/' | '/anotherPage' | '/callback' | '/login'
+  to:
+    | '/anotherPage'
+    | '/callback'
+    | '/login'
+    | '/'
+    | '/repository/$id'
+    | '/repositories'
+  id:
+    | '__root__'
+    | '/_dashboard'
+    | '/anotherPage'
+    | '/callback'
+    | '/login'
+    | '/_dashboard/'
+    | '/_dashboard/repository/$id'
+    | '/_dashboard/repositories/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
-  IndexRoute: typeof IndexRoute
+  DashboardRoute: typeof DashboardRouteWithChildren
   AnotherPageRoute: typeof AnotherPageRoute
   CallbackRoute: typeof CallbackRoute
   LoginRoute: typeof LoginRoute
@@ -71,11 +116,11 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/': {
-      id: '/'
-      path: '/'
+    '/_dashboard': {
+      id: '/_dashboard'
+      path: ''
       fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
+      preLoaderRoute: typeof DashboardRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/anotherPage': {
@@ -99,11 +144,48 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_dashboard/': {
+      id: '/_dashboard/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof DashboardIndexRouteImport
+      parentRoute: typeof DashboardRoute
+    }
+    '/_dashboard/repositories/': {
+      id: '/_dashboard/repositories/'
+      path: '/repositories'
+      fullPath: '/repositories/'
+      preLoaderRoute: typeof DashboardRepositoriesIndexRouteImport
+      parentRoute: typeof DashboardRoute
+    }
+    '/_dashboard/repository/$id': {
+      id: '/_dashboard/repository/$id'
+      path: '/repository/$id'
+      fullPath: '/repository/$id'
+      preLoaderRoute: typeof DashboardRepositoryIdRouteImport
+      parentRoute: typeof DashboardRoute
+    }
   }
 }
 
+interface DashboardRouteChildren {
+  DashboardIndexRoute: typeof DashboardIndexRoute
+  DashboardRepositoryIdRoute: typeof DashboardRepositoryIdRoute
+  DashboardRepositoriesIndexRoute: typeof DashboardRepositoriesIndexRoute
+}
+
+const DashboardRouteChildren: DashboardRouteChildren = {
+  DashboardIndexRoute: DashboardIndexRoute,
+  DashboardRepositoryIdRoute: DashboardRepositoryIdRoute,
+  DashboardRepositoriesIndexRoute: DashboardRepositoriesIndexRoute,
+}
+
+const DashboardRouteWithChildren = DashboardRoute._addFileChildren(
+  DashboardRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
-  IndexRoute: IndexRoute,
+  DashboardRoute: DashboardRouteWithChildren,
   AnotherPageRoute: AnotherPageRoute,
   CallbackRoute: CallbackRoute,
   LoginRoute: LoginRoute,

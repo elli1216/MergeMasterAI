@@ -14,6 +14,7 @@ class PipelineState(TypedDict, total=False):
     files: list[str]
     head_sha: str
     head_ref: str
+    has_merge_conflicts: bool
     findings: list[Finding]
     fixes: list[FixDraft]
     remediation_sha: str | None

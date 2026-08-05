@@ -1,25 +1,24 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { useAction, useMutation } from 'convex/react'
+import { useMutation } from 'convex/react'
 import { useQueryClient, useSuspenseQuery } from '@tanstack/react-query'
 import { convexQuery } from '@convex-dev/react-query'
 import { useAuth } from '@workos-inc/authkit-react'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { api } from '../../convex/_generated/api'
 import type { Doc, Id } from '../../convex/_generated/dataModel'
 import type {ReviewTarget} from '~/components/dashboard';
 import type {AiReview} from '~/lib/backend';
 import {
   AiReviewDialog,
+  AnalyzeHistoryPanel,
   CommitsPanel,
-  DashboardHeader,
   PullRequestsPanel,
-  RepositorySidebar,
-  
   StatsGrid
 } from '~/components/dashboard'
-import {  requestAiReview } from '~/lib/backend'
+import { requestAiReview } from '~/lib/backend'
 
-export const Route = createFileRoute('/')({
+
+export const Route = createFileRoute('/_dashboard/')({
   component: IndexPage,
 })
 
@@ -98,16 +97,12 @@ function LandingPage({ onSignIn, onSignUp }: { onSignIn: () => void, onSignUp: (
 }
 
 function Dashboard() {
-  const { user, signOut } = useAuth()
   const { data: prs } = useSuspenseQuery(convexQuery(api.pullRequests.getActivePRs, {}))
-  const { data: repos } = useSuspenseQuery(convexQuery(api.repositories.getUserRepositories, {}))
   const { data: commits } = useSuspenseQuery(convexQuery(api.github.getRecentCommits, {}))
+  const { data: historyLogs } = useSuspenseQuery(convexQuery(api.pullRequests.getAnalyzeHistory, {}))
   const overrideDecision = useMutation(api.pullRequests.overrideDecision)
-  const syncGitHub = useAction(api.github.syncGitHubData)
+  const saveMarkdown = useMutation(api.pullRequests.saveMarkdownReport)
   const queryClient = useQueryClient()
-  const [syncing, setSyncing] = useState(false)
-  const [syncMessage, setSyncMessage] = useState<string | null>(null)
-  const didAutoSync = useRef(false)
 
   const [reviewTarget, setReviewTarget] = useState<ReviewTarget | null>(null)
   const [review, setReview] = useState<AiReview | null>(null)
@@ -115,36 +110,27 @@ function Dashboard() {
   const [reviewError, setReviewError] = useState<string | null>(null)
   const [reviewOpen, setReviewOpen] = useState(false)
 
-  const doSync = useCallback(async () => {
-    const token = localStorage.getItem('github_oauth_access_token')
-    if (!token) {
-      setSyncMessage('No GitHub token found. Sign out and sign back in to grant GitHub access.')
-      return
-    }
-    setSyncing(true)
-    setSyncMessage(null)
-    try {
-      const result = await syncGitHub({ token })
-      setSyncMessage(`Synced ${result.repos} repos, ${result.prs} PRs, ${result.commits} commits`)
-    } catch (err) {
-      setSyncMessage(err instanceof Error ? err.message : String(err))
-    } finally {
-      setSyncing(false)
-    }
-  }, [syncGitHub])
-
-  useEffect(() => {
-    if (!didAutoSync.current) {
-      didAutoSync.current = true
-      doSync()
-    }
-  }, [doSync])
-
-  const handleOverride = async (prId: Id<'pull_requests'>, status: 'approved' | 'blocked') => {
-    const reason = window.prompt(`Reason for overriding to ${status}?`)
+  const handleOverride = async (prId: Id<'pull_requests'>, status: 'approved' | 'blocked', reason: string) => {
     if (reason) {
       await overrideDecision({ prId, status, reason })
     }
+  }
+
+  const handleSaveMarkdown = async (markdown: string) => {
+    if (!reviewTarget) return
+    await saveMarkdown({
+      github_pr_id: String(reviewTarget.prNumber),
+      repo_name: reviewTarget.repoName,
+      markdown_report: markdown,
+    })
+  }
+
+  const handleViewHistory = (log: any) => {
+    setReviewTarget({ repoName: log.repo_name, prNumber: Number(log.github_pr_id), title: log.pr_title })
+    setReview(log.full_review || null)
+    setReviewError(null)
+    setReviewing(false)
+    setReviewOpen(true)
   }
 
   const handleReview = async (pr: Doc<'pull_requests'>) => {
@@ -158,10 +144,18 @@ function Dashboard() {
       return
     }
     setReviewTarget({ repoName: pr.repo_name, prNumber, title: pr.title })
+    setReviewOpen(true)
+
+    if (pr.full_review) {
+      setReview(pr.full_review as AiReview)
+      setReviewError(null)
+      setReviewing(false)
+      return
+    }
+
     setReview(null)
     setReviewError(null)
     setReviewing(true)
-    setReviewOpen(true)
     try {
       const result = await requestAiReview(pr.repo_name, prNumber)
       setReview(result)
@@ -173,38 +167,33 @@ function Dashboard() {
     }
   }
 
-  const openPrCount: Record<string, number> = {}
-  for (const pr of prs) {
-    if (pr.status === 'pending' || pr.status === 'approved' || pr.status === 'blocked') {
-      openPrCount[pr.repo_name] = (openPrCount[pr.repo_name] ?? 0) + 1
+  const handleReanalyze = async () => {
+    if (!reviewTarget) return
+    setReview(null)
+    setReviewError(null)
+    setReviewing(true)
+    try {
+      const result = await requestAiReview(reviewTarget.repoName, reviewTarget.prNumber)
+      setReview(result)
+      await queryClient.invalidateQueries()
+    } catch (err) {
+      setReviewError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setReviewing(false)
     }
   }
+
   const activeCount = prs.filter((pr) => pr.status === 'pending').length
   const blockedCount = prs.filter((pr) => pr.status === 'blocked').length
   const approvedCount = prs.filter((pr) => pr.status === 'approved').length
 
   return (
-    <div className="min-h-screen bg-black text-zinc-50 p-4 md:p-8 font-sans selection:bg-white selection:text-black">
-      <div className="max-w-7xl mx-auto space-y-12">
-        <DashboardHeader
-          userName={`${user?.firstName ?? ''} ${user?.lastName ?? ''}`}
-          userEmail={user?.email ?? ''}
-          avatarUrl={user?.profilePictureUrl ?? undefined}
-          syncing={syncing}
-          syncMessage={syncMessage}
-          onSync={() => doSync()}
-          onSignOut={() => signOut()}
-        />
-
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-          <RepositorySidebar repos={repos} openPrCount={openPrCount} />
-
-          <div className="lg:col-span-3 space-y-12">
-            <StatsGrid active={activeCount} blocked={blockedCount} approved={approvedCount} commits={commits.length} />
-            <PullRequestsPanel prs={prs} onOverride={handleOverride} onReview={handleReview} />
-            <CommitsPanel commits={commits} />
-          </div>
-        </div>
+    <>
+      <div className="space-y-12">
+        <StatsGrid active={activeCount} blocked={blockedCount} approved={approvedCount} commits={commits.length} />
+        <PullRequestsPanel prs={prs} onOverride={handleOverride} onReview={handleReview} />
+        <CommitsPanel commits={commits} />
+        <AnalyzeHistoryPanel logs={historyLogs} onView={handleViewHistory} />
       </div>
 
       <AiReviewDialog
@@ -214,7 +203,9 @@ function Dashboard() {
         review={review}
         loading={reviewing}
         error={reviewError}
+        onReanalyze={handleReanalyze}
+        onSaveMarkdown={handleSaveMarkdown}
       />
-    </div>
+    </>
   )
 }

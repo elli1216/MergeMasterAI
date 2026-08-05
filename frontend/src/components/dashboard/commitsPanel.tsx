@@ -1,4 +1,4 @@
-import { RefreshCw } from 'lucide-react'
+import { RefreshCw, ExternalLink } from 'lucide-react'
 import type { Doc } from '../../../convex/_generated/dataModel'
 import { Card, CardContent } from '~/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '~/components/ui/table'
@@ -30,7 +30,18 @@ export function CommitsPanel({ commits }: CommitsPanelProps) {
               <TableBody>
                 {commits.map((c) => (
                   <TableRow key={c._id} className="border-b border-zinc-800 hover:bg-zinc-900/50 transition-colors">
-                    <TableCell className="font-mono text-zinc-500 text-xs">{c.sha.slice(0, 7)}</TableCell>
+                    <TableCell className="font-mono text-zinc-500 text-xs">
+                      <a
+                        href={`https://github.com/${c.repo_name}/commit/${c.sha}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="flex items-center gap-1 hover:text-white hover:underline transition-colors group"
+                        title={`View commit ${c.sha} on GitHub`}
+                      >
+                        {c.sha.slice(0, 7)}
+                        <ExternalLink size={10} className="opacity-0 group-hover:opacity-100 transition-opacity" />
+                      </a>
+                    </TableCell>
                     <TableCell>
                       <div className="text-sm text-white tracking-tight truncate max-w-[300px]">{c.message.split('\n')[0]}</div>
                     </TableCell>

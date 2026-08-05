@@ -31,6 +31,16 @@ export default defineSchema({
     .index('by_repository_id', ['repository_id'])
     .index('by_committed_at', ['committed_at']),
 
+  branches: defineTable({
+    repository_id: v.id('repositories'),
+    repo_name: v.string(),
+    name: v.string(),
+    last_commit_sha: v.string(),
+    is_protected: v.optional(v.boolean()),
+  })
+    .index('by_repository_id', ['repository_id'])
+    .index('by_repo_name_and_name', ['repo_name', 'name']),
+
   pull_requests: defineTable({
     github_pr_id: v.string(),
     repository_id: v.optional(v.id('repositories')),
@@ -46,9 +56,12 @@ export default defineSchema({
     ),
     risk_score: v.number(), // 0 to 100
     ai_summary: v.string(),
+    full_review: v.optional(v.any()),
+    markdown_report: v.optional(v.string()),
     updated_at: v.number(),
   })
     .index('by_github_pr_id', ['github_pr_id'])
+    .index('by_repository_id', ['repository_id'])
     .index('by_repo_name_and_github_pr_id', ['repo_name', 'github_pr_id'])
     .index('by_status', ['status']),
 

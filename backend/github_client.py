@@ -63,7 +63,7 @@ def get_installation_token(owner: str) -> str | None:
         return None
 
     try:
-        token = matched.get_access_token().token
+        token = integration.get_access_token(matched.id).token
     except Exception as exc:
         logger.warning("failed to obtain installation access token: %s", exc)
         return None
@@ -105,6 +105,7 @@ def fetch_pr_diff(
         "head_ref": pr.head.ref,
         "title": pr.title,
         "author": pr.user.login if pr.user else "",
+        "mergeable": pr.mergeable,
     }
 
 
