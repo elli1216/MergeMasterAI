@@ -20,22 +20,35 @@ async def extract_diff(state: PipelineState) -> PipelineState:
         return state
     owner, repo = state["repo_name"].split("/", 1)
     try:
-        data = await asyncio.to_thread(github_client.fetch_pr_diff, owner, repo, state["pr_number"])
+        data = await asyncio.to_thread(
+            github_client.fetch_pr_diff,
+            owner,
+            repo,
+            state["pr_number"],
+            state.get("github_token"),
+        )
     except Exception as exc:
         return {**state, "error": f"diff extraction failed: {exc}"}
     if not data:
-        return {**state, "error": "diff extraction failed: no GitHub App credentials or installation found"}
-    return {
+        return {**state, "error": "diff extraction failed: no GitHub credentials or installation found"}
+    merged = {
         **state,
         "diff": data["diff"],
         "files": data["files"],
         "head_sha": data["head_sha"],
         "head_ref": data["head_ref"],
     }
+    if not merged.get("title"):
+        merged["title"] = data.get("title", "")
+    if not merged.get("author"):
+        merged["author"] = data.get("author", "")
+    return merged
 
 
 async def analyze_changes(state: PipelineState) -> PipelineState:
-    result = await analyze(state["title"], state["author"], state["diff"], state["files"])
+    result = await analyze(
+        state.get("title", ""), state.get("author", ""), state["diff"], state["files"]
+    )
     return {
         **state,
         "decision": result.suggested_decision,

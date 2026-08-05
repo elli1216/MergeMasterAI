@@ -4,6 +4,7 @@ import logging
 import os
 
 from fastapi import FastAPI, Request, HTTPException, BackgroundTasks
+from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 
 from agents.graph import run_pipeline
@@ -17,6 +18,21 @@ logger = logging.getLogger(__name__)
 load_dotenv()
 
 app = FastAPI(title="MergeMaster AI Backend", version="1.0.0")
+
+# Allow the frontend dashboard (Vite dev server) to call the review endpoint.
+CORS_ORIGINS = [
+    origin.strip()
+    for origin in os.getenv(
+        "CORS_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000"
+    ).split(",")
+    if origin.strip()
+]
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=CORS_ORIGINS,
+    allow_methods=["GET", "POST"],
+    allow_headers=["*"],
+)
 
 GITHUB_WEBHOOK_SECRET = os.getenv("GITHUB_WEBHOOK_SECRET")
 
@@ -105,6 +121,47 @@ async def github_webhook(request: Request, background_tasks: BackgroundTasks):
             )
 
     return {"status": "success"}
+
+
+@app.post("/api/reviews")
+async def run_review(request: Request):
+    """
+    On-demand AI review of a pull request, called by the frontend dashboard.
+
+    Body: { "repo_name": "owner/repo", "pr_number": 12, "github_token": "<optional user OAuth token>" }
+
+    Runs the same LangGraph pipeline as the webhook path and returns the full
+    review (findings, risk score, decision, routed reviewers).
+    """
+    body = await request.json()
+    repo_name = (body.get("repo_name") or "").strip()
+    pr_number = body.get("pr_number")
+    github_token = body.get("github_token") or None
+    if not repo_name or not isinstance(pr_number, int):
+        raise HTTPException(
+            status_code=422, detail="repo_name (str) and pr_number (int) are required"
+        )
+
+    state = await run_pipeline(
+        repo_name=repo_name,
+        pr_number=pr_number,
+        title=body.get("title") or "",
+        author=body.get("author") or "",
+        github_token=github_token,
+    )
+    return {
+        "repo_name": state.get("repo_name"),
+        "pr_number": state.get("pr_number"),
+        "status": state.get("status"),
+        "risk_score": state.get("risk_score"),
+        "decision": state.get("decision"),
+        "ai_summary": state.get("ai_summary"),
+        "reviewers": state.get("reviewers", []),
+        "findings": [f.model_dump() for f in state.get("findings", [])],
+        "head_sha": state.get("head_sha"),
+        "remediation_note": state.get("remediation_note"),
+        "error": state.get("error"),
+    }
 
 
 if __name__ == "__main__":

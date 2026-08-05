@@ -9,6 +9,7 @@ class PipelineState(TypedDict, total=False):
     pr_number: int
     title: str
     author: str
+    github_token: str | None
     diff: str
     files: list[str]
     head_sha: str

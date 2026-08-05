@@ -47,12 +47,20 @@ def get_graph():
     return _GRAPH
 
 
-async def run_pipeline(*, repo_name: str, pr_number: int, title: str, author: str) -> dict:
+async def run_pipeline(
+    *,
+    repo_name: str,
+    pr_number: int,
+    title: str = "",
+    author: str = "",
+    github_token: str | None = None,
+) -> dict:
     return await get_graph().ainvoke(
         {
             "repo_name": repo_name,
             "pr_number": pr_number,
             "title": title,
             "author": author,
+            "github_token": github_token,
         }
     )

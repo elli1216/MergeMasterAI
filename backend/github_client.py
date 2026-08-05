@@ -72,11 +72,21 @@ def get_installation_token(owner: str) -> str | None:
     return token
 
 
-def fetch_pr_diff(owner: str, repo: str, pr_number: int) -> dict | None:
-    token = get_installation_token(owner)
-    if not token:
-        return None
-    gh = Github(token)
+def fetch_pr_diff(
+    owner: str, repo: str, pr_number: int, token: str | None = None
+) -> dict | None:
+    """Fetch PR diff/file list/head info.
+
+    `token` is an optional user-provided OAuth token (used when the GitHub App
+    is not installed on the repo); otherwise an App installation token is used.
+    """
+    if token:
+        gh = Github(token)
+    else:
+        token = get_installation_token(owner)
+        if not token:
+            return None
+        gh = Github(token)
     try:
         pr = gh.get_repo(f"{owner}/{repo}").get_pull(pr_number)
         files = list(pr.get_files())
@@ -93,6 +103,8 @@ def fetch_pr_diff(owner: str, repo: str, pr_number: int) -> dict | None:
         "files": [f.filename for f in files],
         "head_sha": pr.head.sha,
         "head_ref": pr.head.ref,
+        "title": pr.title,
+        "author": pr.user.login if pr.user else "",
     }
 
 

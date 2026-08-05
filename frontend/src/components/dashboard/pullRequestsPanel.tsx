@@ -7,9 +7,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '~
 type PullRequestsPanelProps = {
   prs: Array<Doc<'pull_requests'>>
   onOverride: (prId: Id<'pull_requests'>, status: 'approved' | 'blocked') => void
+  onReview: (pr: Doc<'pull_requests'>) => void
 }
 
-export function PullRequestsPanel({ prs, onOverride }: PullRequestsPanelProps) {
+export function PullRequestsPanel({ prs, onOverride, onReview }: PullRequestsPanelProps) {
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-end">
@@ -70,6 +71,14 @@ export function PullRequestsPanel({ prs, onOverride }: PullRequestsPanelProps) {
                       "{pr.ai_summary}"
                     </TableCell>
                     <TableCell className="text-right space-x-1">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => onReview(pr)}
+                        className="h-7 px-2 text-[10px] font-mono uppercase tracking-wider text-zinc-300 hover:text-black hover:bg-white rounded-none transition-all"
+                      >
+                        AI
+                      </Button>
                       <Button
                         variant="ghost"
                         size="sm"

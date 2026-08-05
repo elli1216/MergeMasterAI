@@ -1,12 +1,23 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { useAction, useMutation } from 'convex/react'
-import { useSuspenseQuery } from '@tanstack/react-query'
+import { useQueryClient, useSuspenseQuery } from '@tanstack/react-query'
 import { convexQuery } from '@convex-dev/react-query'
 import { useAuth } from '@workos-inc/authkit-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { api } from '../../convex/_generated/api'
-import type { Id } from '../../convex/_generated/dataModel'
-import { CommitsPanel, DashboardHeader, PullRequestsPanel, RepositorySidebar, StatsGrid } from '~/components/dashboard'
+import type { Doc, Id } from '../../convex/_generated/dataModel'
+import type {ReviewTarget} from '~/components/dashboard';
+import type {AiReview} from '~/lib/backend';
+import {
+  AiReviewDialog,
+  CommitsPanel,
+  DashboardHeader,
+  PullRequestsPanel,
+  RepositorySidebar,
+  
+  StatsGrid
+} from '~/components/dashboard'
+import {  requestAiReview } from '~/lib/backend'
 
 export const Route = createFileRoute('/')({
   component: IndexPage,
@@ -93,9 +104,16 @@ function Dashboard() {
   const { data: commits } = useSuspenseQuery(convexQuery(api.github.getRecentCommits, {}))
   const overrideDecision = useMutation(api.pullRequests.overrideDecision)
   const syncGitHub = useAction(api.github.syncGitHubData)
+  const queryClient = useQueryClient()
   const [syncing, setSyncing] = useState(false)
   const [syncMessage, setSyncMessage] = useState<string | null>(null)
   const didAutoSync = useRef(false)
+
+  const [reviewTarget, setReviewTarget] = useState<ReviewTarget | null>(null)
+  const [review, setReview] = useState<AiReview | null>(null)
+  const [reviewing, setReviewing] = useState(false)
+  const [reviewError, setReviewError] = useState<string | null>(null)
+  const [reviewOpen, setReviewOpen] = useState(false)
 
   const doSync = useCallback(async () => {
     const token = localStorage.getItem('github_oauth_access_token')
@@ -129,6 +147,32 @@ function Dashboard() {
     }
   }
 
+  const handleReview = async (pr: Doc<'pull_requests'>) => {
+    const prNumber = Number(pr.github_pr_id)
+    if (!Number.isInteger(prNumber)) {
+      setReviewTarget(null)
+      setReview(null)
+      setReviewError(`Invalid PR number for "${pr.title}"`)
+      setReviewing(false)
+      setReviewOpen(true)
+      return
+    }
+    setReviewTarget({ repoName: pr.repo_name, prNumber, title: pr.title })
+    setReview(null)
+    setReviewError(null)
+    setReviewing(true)
+    setReviewOpen(true)
+    try {
+      const result = await requestAiReview(pr.repo_name, prNumber)
+      setReview(result)
+      await queryClient.invalidateQueries()
+    } catch (err) {
+      setReviewError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setReviewing(false)
+    }
+  }
+
   const openPrCount: Record<string, number> = {}
   for (const pr of prs) {
     if (pr.status === 'pending' || pr.status === 'approved' || pr.status === 'blocked') {
@@ -157,11 +201,20 @@ function Dashboard() {
 
           <div className="lg:col-span-3 space-y-12">
             <StatsGrid active={activeCount} blocked={blockedCount} approved={approvedCount} commits={commits.length} />
-            <PullRequestsPanel prs={prs} onOverride={handleOverride} />
+            <PullRequestsPanel prs={prs} onOverride={handleOverride} onReview={handleReview} />
             <CommitsPanel commits={commits} />
           </div>
         </div>
       </div>
+
+      <AiReviewDialog
+        open={reviewOpen}
+        onOpenChange={setReviewOpen}
+        target={reviewTarget}
+        review={review}
+        loading={reviewing}
+        error={reviewError}
+      />
     </div>
   )
 }
