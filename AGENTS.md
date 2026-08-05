@@ -10,11 +10,11 @@ MergeMaster AI: an autonomous PR-review / risk-scoring app for the IBM AI Builde
   - `pnpm lint` — `tsc && eslint .` with `--max-warnings 0`; must pass cleanly.
   - `pnpm build` — `vite build && tsc --noEmit`.
 - Files under `convex/_generated/` and `src/routeTree.gen.ts` are **generated** (Convex CLI / TanStack Router) — never hand-edit.
-- Convex backend lives in `frontend/convex/`: schema in `convex/schema.ts`, functions in `convex/{pullRequests,repositories,users}.ts`. Before editing Convex code, read `frontend/AGENTS.md` and `convex/_generated/ai/guidelines.md` (Convex rules override training-data assumptions). `frontend/AGENTS.md`'s `convex-ai-start/end` block is CLI-managed — keep it intact.
+- Convex backend lives in `frontend/convex/`: schema in `convex/schema.ts`, functions in `convex/{pullRequests,repositories,users,github}.ts`. Before editing Convex code, read `frontend/AGENTS.md` and `convex/_generated/ai/guidelines.md` (Convex rules override training-data assumptions). `frontend/AGENTS.md`'s `convex-ai-start/end` block is CLI-managed — keep it intact.
 - `convex/myFunctions.ts` is an intentional mock kept only for boilerplate compatibility (the `numbers` table was deleted).
 - Routing is file-based under `src/routes/`. `~/*` path alias maps to `src/*`.
 - Env (in `frontend/.env.local`, gitignored): `VITE_CONVEX_URL` and `VITE_WORKOS_CLIENT_ID` (used in `src/router.tsx`).
-- Style: Prettier with no semicolons, single quotes, trailing commas. Dashboard can seed mock data via the "SEED DATA" button (`seedMockData` / `seedMockRepositories` mutations are idempotent).
+- Style: Prettier with no semicolons, single quotes, trailing commas. The dashboard pulls the logged-in user's real GitHub data (repos/PRs/commits) via the WorkOS GitHub OAuth token captured in `src/router.tsx` `onRedirectCallback` (stored in localStorage as `github_oauth_access_token`) and synced into Convex by the `api.github.syncGitHubData` action (auto-runs on dashboard load; "SYNC GITHUB" button re-runs it). Requires the WorkOS app to have "Return GitHub OAuth tokens" enabled and the `repo` scope; user must re-login after enabling.
 
 ## Backend (`backend/`, FastAPI)
 

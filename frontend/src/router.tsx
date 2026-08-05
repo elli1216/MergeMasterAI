@@ -37,6 +37,15 @@ export function getRouter() {
         <AuthKitProvider 
           clientId={(import.meta as any).env.VITE_WORKOS_CLIENT_ID || 'client_placeholder'}
           redirectUri={typeof window !== 'undefined' ? `${window.location.origin}/callback` : 'http://localhost:3000/callback'}
+          onRedirectCallback={(params) => {
+            const oauth = (params as unknown as { oauth_tokens?: { access_token?: string } })
+              .oauth_tokens
+            const githubToken = oauth?.access_token
+            if (githubToken) {
+              localStorage.setItem('github_oauth_access_token', githubToken)
+            }
+            window.location.href = '/'
+          }}
         >
           <ConvexProvider client={convexQueryClient.convexClient}>
             {children}

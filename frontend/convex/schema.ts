@@ -18,7 +18,18 @@ export default defineSchema({
     owner: v.string(), // The GitHub user or organization
     is_active: v.boolean(), // Is MergeMaster enabled for this repo?
     github_repo_id: v.optional(v.string()),
-  }),
+  }).index('by_github_repo_id', ['github_repo_id']),
+
+  commits: defineTable({
+    repository_id: v.id('repositories'),
+    repo_name: v.string(),
+    sha: v.string(),
+    author: v.string(),
+    message: v.string(),
+    committed_at: v.string(),
+  })
+    .index('by_repository_id', ['repository_id'])
+    .index('by_committed_at', ['committed_at']),
 
   pull_requests: defineTable({
     github_pr_id: v.string(),
