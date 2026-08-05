@@ -1,6 +1,7 @@
 from typing import TypedDict
 
-from granite_client import Finding
+from committer_agent import FixDraft
+from analysis import Finding
 
 
 class PipelineState(TypedDict, total=False):
@@ -11,7 +12,11 @@ class PipelineState(TypedDict, total=False):
     diff: str
     files: list[str]
     head_sha: str
+    head_ref: str
     findings: list[Finding]
+    fixes: list[FixDraft]
+    remediation_sha: str | None
+    remediation_note: str | None
     reviewers: list[str]
     decision: str
     status: str

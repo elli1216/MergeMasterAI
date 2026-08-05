@@ -1,10 +1,14 @@
 import asyncio
+import logging
 
 import convex_client
 import github_client
-from granite_client import analyze
+from committer_agent import apply_fixes, draft_fixes
+from analysis import analyze
 from routing_rules import route_files
 from agents.state import PipelineState
+
+logger = logging.getLogger(__name__)
 
 APPROVED = "approved"
 BLOCKED = "blocked"
@@ -21,7 +25,13 @@ async def extract_diff(state: PipelineState) -> PipelineState:
         return {**state, "error": f"diff extraction failed: {exc}"}
     if not data:
         return {**state, "error": "diff extraction failed: no GitHub App credentials or installation found"}
-    return {**state, "diff": data["diff"], "files": data["files"], "head_sha": data["head_sha"]}
+    return {
+        **state,
+        "diff": data["diff"],
+        "files": data["files"],
+        "head_sha": data["head_sha"],
+        "head_ref": data["head_ref"],
+    }
 
 
 async def analyze_changes(state: PipelineState) -> PipelineState:
@@ -57,6 +67,33 @@ async def route_reviewers(state: PipelineState) -> PipelineState:
     return {**state, "reviewers": reviewers, "status": status, "ai_summary": ai_summary}
 
 
+async def committer_agent(state: PipelineState) -> PipelineState:
+    if state.get("error"):
+        return state
+    fixes, notes = await draft_fixes(state.get("findings", []), state["diff"])
+    note = "; ".join(notes)
+    if not fixes:
+        note = f"{note}; " if note else ""
+        note += "no safe automatic remediation drafted"
+        return {**state, "remediation_note": note}
+    new_sha, applied = await asyncio.to_thread(
+        apply_fixes, state["repo_name"], state["head_ref"], state["head_sha"], fixes
+    )
+    if not applied:
+        note = f"{note}; " if note else ""
+        note += "fixes drafted but could not be pushed (no GitHub App access)"
+        return {**state, "remediation_note": note}
+    ai_summary = f"{state['ai_summary']} Remediation commit {new_sha[:7]} pushed by Committer Agent."
+    return {
+        **state,
+        "status": PENDING,
+        "ai_summary": ai_summary,
+        "head_sha": new_sha,
+        "remediation_sha": new_sha,
+        "remediation_note": note,
+    }
+
+
 async def enforce_gate(state: PipelineState) -> PipelineState:
     if state.get("error"):
         return state
@@ -74,7 +111,9 @@ async def enforce_gate(state: PipelineState) -> PipelineState:
 
 async def record_result(state: PipelineState) -> PipelineState:
     if state.get("error"):
-        print(f"[pipeline] failed for PR #{state.get('pr_number')}: {state['error']}")
+        logger.error(
+            "pipeline failed for PR #%s: %s", state.get("pr_number"), state["error"]
+        )
         return state
 
     await convex_client.update_pull_request_analysis(
@@ -85,11 +124,15 @@ async def record_result(state: PipelineState) -> PipelineState:
         ai_summary=state["ai_summary"],
     )
 
-    decision_type = {
-        APPROVED: "auto_approve",
-        BLOCKED: "block_merge",
-        PENDING: "route_reviewer",
-    }.get(state["status"], "route_reviewer")
+    decision_type = (
+        "remediate_code"
+        if state.get("remediation_sha")
+        else {
+            APPROVED: "auto_approve",
+            BLOCKED: "block_merge",
+            PENDING: "route_reviewer",
+        }.get(state["status"], "route_reviewer")
+    )
     await convex_client.log_analysis_decision(
         github_pr_id=str(state["pr_number"]),
         repo_name=state["repo_name"],
@@ -97,8 +140,11 @@ async def record_result(state: PipelineState) -> PipelineState:
         reasoning=state["ai_summary"],
     )
 
-    print(
-        f"[pipeline] PR #{state['pr_number']} -> {state['status']} "
-        f"(risk {state['risk_score']}) reviewers={state.get('reviewers')}"
+    logger.info(
+        "PR #%s -> %s (risk %s) reviewers=%s",
+        state["pr_number"],
+        state["status"],
+        state["risk_score"],
+        state.get("reviewers"),
     )
     return state

@@ -7,6 +7,9 @@ GITHUB_APP_ID = os.getenv("GITHUB_APP_ID")
 GITHUB_PRIVATE_KEY = os.getenv("GITHUB_PRIVATE_KEY")
 CONVEX_URL = os.getenv("CONVEX_URL")
 CONVEX_ADMIN_KEY = os.getenv("CONVEX_ADMIN_KEY")
-GRANITE_API_BASE = os.getenv("GRANITE_API_BASE")
-GRANITE_API_KEY = os.getenv("GRANITE_API_KEY")
-GRANITE_MODEL = os.getenv("GRANITE_MODEL", "granite3.2:8b")
+# LLM backend: Google Gemini via its OpenAI-compatible endpoint.
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY") or os.getenv("LLM_API_KEY")
+LLM_API_BASE = os.getenv(
+    "LLM_API_BASE", "https://generativelanguage.googleapis.com/v1beta/openai"
+)
+LLM_MODEL = os.getenv("LLM_MODEL", "gemini-3.5-flash-lite")

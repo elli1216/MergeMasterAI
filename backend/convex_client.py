@@ -1,23 +1,25 @@
-import httpx
+import logging
 
 import config
+import http_client
+
+logger = logging.getLogger(__name__)
 
 
 async def _call_mutation(path: str, args: dict) -> bool:
     if not (config.CONVEX_URL and config.CONVEX_ADMIN_KEY):
-        print(f"[convex] CONVEX_URL / CONVEX_ADMIN_KEY not set; skipping '{path}'")
+        logger.info("CONVEX_URL / CONVEX_ADMIN_KEY not set; skipping '%s'", path)
         return False
     try:
-        async with httpx.AsyncClient(timeout=30) as client:
-            resp = await client.post(
-                f"{config.CONVEX_URL.rstrip('/')}/api/mutation",
-                json={"path": path, "args": args},
-                headers={"Authorization": f"Bearer {config.CONVEX_ADMIN_KEY}"},
-            )
-            resp.raise_for_status()
+        resp = await http_client.get_async_client().post(
+            f"{config.CONVEX_URL.rstrip('/')}/api/mutation",
+            json={"path": path, "args": args},
+            headers={"Authorization": f"Bearer {config.CONVEX_ADMIN_KEY}"},
+        )
+        resp.raise_for_status()
         return True
     except Exception as exc:
-        print(f"[convex] failed to call '{path}': {exc}")
+        logger.warning("failed to call '%s': %s", path, exc)
         return False
 
 
@@ -40,7 +42,7 @@ async def update_pull_request_analysis(
         },
     )
     if ok:
-        print(f"[convex] updated PR #{github_pr_id} on {repo_name}")
+        logger.info("updated PR #%s on %s", github_pr_id, repo_name)
     return ok
 
 

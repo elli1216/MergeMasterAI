@@ -1,8 +1,19 @@
+import itertools
+import logging
+import time
+
 from github import Github, GithubIntegration
 
 import config
 
+logger = logging.getLogger(__name__)
+
 GATE_CONTEXT = "MergeMaster AI / risk-gate"
+
+# GitHub App installation tokens are valid for 1 hour; cache per-owner so we
+# don't re-sign the JWT and re-enumerate installations on every pipeline step.
+_TOKEN_TTL_SECONDS = 55 * 60
+_token_cache: dict[str, tuple[str, float]] = {}
 
 
 def _private_key() -> str | None:
@@ -12,26 +23,53 @@ def _private_key() -> str | None:
     return raw.replace("\\n", "\n")
 
 
+def _cached_token(owner: str) -> str | None:
+    entry = _token_cache.get(owner)
+    if entry and entry[1] > time.monotonic():
+        return entry[0]
+    return None
+
+
 def get_installation_token(owner: str) -> str | None:
+    cached = _cached_token(owner)
+    if cached:
+        return cached
+
     if not (config.GITHUB_APP_ID and _private_key()):
-        print("[github] GITHUB_APP_ID / GITHUB_PRIVATE_KEY not set; cannot authenticate as GitHub App")
+        logger.info(
+            "GITHUB_APP_ID / GITHUB_PRIVATE_KEY not set; cannot authenticate as GitHub App"
+        )
         return None
+
     try:
-        integration = GithubIntegration(config.GITHUB_APP_ID, _private_key())
+        integration = GithubIntegration(str(config.GITHUB_APP_ID), _private_key())
         installations = list(integration.get_installations())
     except Exception as exc:
-        print(f"[github] GitHub App authentication failed: {exc}")
+        logger.warning("GitHub App authentication failed: %s", exc)
         return None
+
+    matched = None
     for installation in installations:
         if (installation.account.login or "").lower() == owner.lower():
-            return installation.get_access_token().token
-    for installation in installations:
-        try:
-            return installation.get_access_token().token
-        except Exception:
-            continue
-    print(f"[github] no installation found for owner '{owner}'")
-    return None
+            matched = installation
+            break
+    # Fall back only when there is exactly one installation: guessing the first
+    # one across multiple accounts would leak a token meant for another owner.
+    if matched is None and len(installations) == 1:
+        matched = installations[0]
+
+    if matched is None:
+        logger.info("no installation found for owner '%s'", owner)
+        return None
+
+    try:
+        token = matched.get_access_token().token
+    except Exception as exc:
+        logger.warning("failed to obtain installation access token: %s", exc)
+        return None
+
+    _token_cache[owner] = (token, time.monotonic() + _TOKEN_TTL_SECONDS)
+    return token
 
 
 def fetch_pr_diff(owner: str, repo: str, pr_number: int) -> dict | None:
@@ -39,15 +77,22 @@ def fetch_pr_diff(owner: str, repo: str, pr_number: int) -> dict | None:
     if not token:
         return None
     gh = Github(token)
-    pr = gh.get_repo(f"{owner}/{repo}").get_pull(pr_number)
-    files = list(pr.get_files())
+    try:
+        pr = gh.get_repo(f"{owner}/{repo}").get_pull(pr_number)
+        files = list(pr.get_files())
+    except Exception as exc:
+        logger.warning(
+            "failed to fetch PR files for %s/%s #%s: %s", owner, repo, pr_number, exc
+        )
+        return None
     diff = "\n".join(
-        f"--- {f.filename}\n+++ {f.status}\n{f.patch or ''}" for f in files
+        f"--- {f.filename}\n+++ {f.filename} ({f.status})\n{f.patch or ''}" for f in files
     )
     return {
         "diff": diff,
         "files": [f.filename for f in files],
         "head_sha": pr.head.sha,
+        "head_ref": pr.head.ref,
     }
 
 
@@ -64,7 +109,7 @@ def enforce_gate(
     owner, repo = repo_name.split("/", 1)
     token = get_installation_token(owner)
     if not token:
-        print("[github] no GitHub App access; skipping commit-status gate enforcement")
+        logger.info("no GitHub App access; skipping commit-status gate enforcement")
         return
     gh = Github(token)
     gh_repo = gh.get_repo(repo_name)
@@ -83,20 +128,29 @@ def enforce_gate(
             description=description[:140],
             context=GATE_CONTEXT,
         )
-        print(f"[github] commit status '{gate_state}' set on {repo_name}@{head_sha[:7]}")
+        logger.info("commit status '%s' set on %s@%s", gate_state, repo_name, head_sha[:7])
     except Exception as exc:
-        print(f"[github] failed to set commit status: {exc}")
+        logger.warning("failed to set commit status: %s", exc)
 
     if status == "blocked":
         try:
-            gh_repo.create_issue(
-                title=f"[MergeMaster] Blocker on PR #{pr_number} (risk {risk_score}/100)",
-                body=(
-                    f"MergeMaster AI blocked PR #{pr_number}.\n\n"
-                    f"**Reason:** {summary}\n\n"
-                    f"**Risk score:** {risk_score}/100"
-                ),
+            title = f"[MergeMaster] Blocker on PR #{pr_number} (risk {risk_score}/100)"
+            # De-duplicate: repeated webhooks/retries must not spam the repo.
+            existing = any(
+                i.title == title
+                for i in itertools.islice(gh_repo.get_issues(state="open"), 0, 300)
             )
-            print(f"[github] Blocker ticket created for PR #{pr_number}")
+            if existing:
+                logger.info("Blocker ticket already exists for PR #%s; skipping", pr_number)
+            else:
+                gh_repo.create_issue(
+                    title=title,
+                    body=(
+                        f"MergeMaster AI blocked PR #{pr_number}.\n\n"
+                        f"**Reason:** {summary}\n\n"
+                        f"**Risk score:** {risk_score}/100"
+                    ),
+                )
+                logger.info("Blocker ticket created for PR #%s", pr_number)
         except Exception as exc:
-            print(f"[github] failed to create Blocker ticket: {exc}")
+            logger.warning("failed to create Blocker ticket: %s", exc)
