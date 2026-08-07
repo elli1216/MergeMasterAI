@@ -97,14 +97,14 @@ IBM Bob acted as our primary AI pair-programming partner throughout the developm
 
 When a developer opens a Pull Request on GitHub, it triggers the following automated workflow:
 
-1.  **Webhook Trigger:** GitHub sends a webhook to the FastAPI backend.
-2.  **Diff Extraction Node:** FastAPI extracts the raw code diffs and file paths.
-3.  **Analyst Node:** Evaluates the code for bugs, security risks, and logic errors.
-4.  **Decision Branching:**
+1. **Webhook Trigger:** GitHub sends a webhook to the FastAPI backend.
+2. **Diff Extraction Node:** FastAPI extracts the raw code diffs and file paths.
+3. **Analyst Node:** Evaluates the code for bugs, security risks, and logic errors.
+4. **Decision Branching:**
     - _If Critical Bug:_ Routes to the **Committer Agent**, which drafts a fix and pushes it to GitHub via API.
     - _If Safe:_ Routes to the **Orchestrator Agent**.
-5.  **Orchestrator Agent:** Looks at the file paths touched (e.g., `.ts` vs `.py`) and assigns the appropriate human reviewers.
-6.  **State Sync:** The final Risk Score and summary are written to Convex, immediately updating the TanStack frontend.
+5. **Orchestrator Agent:** Looks at the file paths touched (e.g., `.ts` vs `.py`) and assigns the appropriate human reviewers.
+6. **State Sync:** The final Risk Score and summary are written to Convex, immediately updating the TanStack frontend.
 
 ---
 

@@ -1,4 +1,5 @@
 from langgraph.graph import END, START, StateGraph
+from langgraph.checkpoint.memory import MemorySaver
 
 from agents.nodes import (
     analyze_changes,
@@ -37,7 +38,9 @@ def build_graph():
     graph.add_edge("committer_agent", "enforce_gate")
     graph.add_edge("enforce_gate", "record_result")
     graph.add_edge("record_result", END)
-    return graph.compile()
+    
+    memory = MemorySaver()
+    return graph.compile(checkpointer=memory)
 
 
 def get_graph():
@@ -62,5 +65,6 @@ async def run_pipeline(
             "title": title,
             "author": author,
             "github_token": github_token,
-        }
+        },
+        config={"configurable": {"thread_id": f"{repo_name}_{pr_number}"}}
     )
