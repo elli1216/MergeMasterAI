@@ -5,6 +5,7 @@ import { useAuth } from '@workos-inc/authkit-react'
 import { api } from '../../convex/_generated/api'
 
 import { RepositorySidebar as RepositoriesView } from '~/components/dashboard/repositorySidebar'
+import { RoutingRulesPanel } from '~/components/dashboard/routingRulesPanel'
 
 export const Route = createFileRoute('/_dashboard/repositories/')({
   component: RepositoriesPage,
@@ -40,14 +41,18 @@ function RepositoriesPage() {
 
   return (
     <>
-      <div className="space-y-6 max-w-4xl">
-        <div className="flex flex-col gap-2">
-          <h2 className="text-3xl font-light tracking-tighter text-white">Codebases</h2>
-          <p className="text-zinc-500 font-mono text-xs uppercase tracking-widest">Monitored repositories & active pull requests</p>
+      <div className="space-y-12 max-w-4xl">
+        <div className="space-y-6">
+          <div className="flex flex-col gap-2">
+            <h2 className="text-3xl font-light tracking-tighter text-white">Codebases</h2>
+            <p className="text-zinc-500 font-mono text-xs uppercase tracking-widest">Monitored repositories & active pull requests</p>
+          </div>
+          <div className="border border-zinc-900 bg-zinc-950 p-6">
+            <RepositoriesView repos={repos} openPrCount={openPrCount} />
+          </div>
         </div>
-        <div className="border border-zinc-900 bg-zinc-950 p-6">
-          <RepositoriesView repos={repos} openPrCount={openPrCount} />
-        </div>
+
+        <RoutingRulesPanel />
       </div>
     </>
   )

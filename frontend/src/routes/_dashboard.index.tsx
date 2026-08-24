@@ -97,6 +97,7 @@ function LandingPage({ onSignIn, onSignUp }: { onSignIn: () => void, onSignUp: (
 }
 
 function Dashboard() {
+  const { user } = useAuth()
   const { data: prs } = useSuspenseQuery(convexQuery(api.pullRequests.getActivePRs, {}))
   const { data: commits } = useSuspenseQuery(convexQuery(api.github.getRecentCommits, {}))
   const { data: historyLogs } = useSuspenseQuery(convexQuery(api.pullRequests.getAnalyzeHistory, {}))
@@ -112,7 +113,7 @@ function Dashboard() {
 
   const handleOverride = async (prId: Id<'pull_requests'>, status: 'approved' | 'blocked', reason: string) => {
     if (reason) {
-      await overrideDecision({ prId, status, reason })
+      await overrideDecision({ prId, status, reason, userGithubId: user?.id })
     }
   }
 

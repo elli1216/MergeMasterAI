@@ -5,7 +5,7 @@ import convex_client
 import github_client
 from committer_agent import apply_fixes, draft_fixes
 from analysis import analyze
-from routing_rules import route_files
+from routing_rules import RoutingRule, route_files
 from agents.state import PipelineState
 
 logger = logging.getLogger(__name__)
@@ -69,7 +69,24 @@ async def analyze_changes(state: PipelineState) -> PipelineState:
 
 
 async def route_reviewers(state: PipelineState) -> PipelineState:
-    reviewers, docs_only = route_files(state.get("files", []))
+    # Attempt to load custom routing rules from Convex database
+    custom_rules = None
+    try:
+        db_rules = await convex_client.get_routing_rules()
+        if db_rules:
+            custom_rules = [
+                RoutingRule(
+                    file_pattern=r["file_pattern"],
+                    reviewer_role=r["reviewer_role"],
+                    auto_approve=r.get("auto_approve", False),
+                )
+                for r in db_rules
+                if "file_pattern" in r and "reviewer_role" in r
+            ]
+    except Exception as exc:
+        logger.warning("failed to fetch dynamic routing rules, falling back to defaults: %s", exc)
+
+    reviewers, docs_only = route_files(state.get("files", []), rules=custom_rules)
     decision = state["decision"]
     if decision == "auto_approve":
         status = APPROVED

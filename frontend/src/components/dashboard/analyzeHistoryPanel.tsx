@@ -54,6 +54,11 @@ export function AnalyzeHistoryPanel({ logs, onView }: AnalyzeHistoryPanelProps) 
                       >
                         {log.decision_type.replace('_', ' ')}
                       </Badge>
+                      {log.overridden_by_name && (
+                        <div className="text-[9px] font-mono text-zinc-500 mt-1">
+                          by {log.overridden_by_name}
+                        </div>
+                      )}
                     </TableCell>
                     <TableCell className="hidden md:table-cell max-w-[300px] truncate text-xs text-zinc-400 font-serif italic" title={log.reasoning}>
                       "{log.reasoning}"

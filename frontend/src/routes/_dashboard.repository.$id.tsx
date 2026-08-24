@@ -51,7 +51,7 @@ function RepositoryDetailPage() {
 
   const handleOverride = async (prId: Id<'pull_requests'>, status: 'approved' | 'blocked', reason: string) => {
     if (reason) {
-      await overrideDecision({ prId, status, reason })
+      await overrideDecision({ prId, status, reason, userGithubId: user?.id })
     }
   }
 

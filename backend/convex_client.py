@@ -19,8 +19,27 @@ async def _call_mutation(path: str, args: dict) -> bool:
         resp.raise_for_status()
         return True
     except Exception as exc:
-        logger.warning("failed to call '%s': %s", path, exc)
+        logger.warning("failed to call mutation '%s': %s", path, exc)
         return False
+
+
+async def _call_query(path: str, args: dict) -> dict | list | None:
+    if not (config.CONVEX_URL and config.CONVEX_ADMIN_KEY):
+        return None
+    try:
+        resp = await http_client.get_async_client().post(
+            f"{config.CONVEX_URL.rstrip('/')}/api/query",
+            json={"path": path, "args": args},
+            headers={"Authorization": f"Convex {config.CONVEX_ADMIN_KEY}"},
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        if isinstance(data, dict) and "value" in data:
+            return data["value"]
+        return data
+    except Exception as exc:
+        logger.warning("failed to call query '%s': %s", path, exc)
+        return None
 
 
 async def update_pull_request_analysis(
@@ -62,5 +81,28 @@ async def log_analysis_decision(
             "repo_name": repo_name,
             "decision_type": decision_type,
             "reasoning": reasoning,
+        },
+    )
+
+
+async def get_routing_rules() -> list[dict] | None:
+    """Fetch active routing rules from the Convex database."""
+    res = await _call_query("routingRules:getRoutingRules", {})
+    if isinstance(res, list):
+        return res
+    return None
+
+
+async def sync_installation_repositories(
+    *,
+    action: str,
+    repositories: list[dict],
+) -> bool:
+    """Sync repositories added/removed via GitHub App installation."""
+    return await _call_mutation(
+        "repositories:syncInstallationRepositories",
+        {
+            "action": action,
+            "repositories": repositories,
         },
     )

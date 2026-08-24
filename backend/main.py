@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 
 from agents.graph import run_pipeline
+import convex_client
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s %(levelname)s [%(name)s] %(message)s"
@@ -92,11 +93,89 @@ async def github_webhook(request: Request, background_tasks: BackgroundTasks):
 
     # 3. Handle specific events (Phase 2 Implementations)
     if event_type == "installation":
-        # Handle App installation (when a user adds MergeMaster to a repository)
-        action = payload.get("action")
-        repositories = payload.get("repositories", [])
-        logger.info("App installation '%s' across %s repository(s)", action, len(repositories))
-        # TODO: Sync these repositories to the Convex DB
+        # Handle App installation (when a user adds/removes MergeMaster to/from a repository)
+        action = payload.get("action", "")
+        repos_raw = payload.get("repositories", [])
+        account = (
+            payload.get("installation", {}).get("account", {}).get("login")
+            or payload.get("account", {}).get("login")
+            or "unknown"
+        )
+        repos_to_sync = [
+            {
+                "name": r.get("name") or r.get("full_name", "").split("/")[-1],
+                "owner": (
+                    r.get("full_name", "").split("/")[0]
+                    if "/" in r.get("full_name", "")
+                    else account
+                ),
+                "githubRepoId": str(r.get("id")),
+            }
+            for r in repos_raw
+            if r.get("id")
+        ]
+        logger.info(
+            "App installation '%s' for %s repository(s) under owner %s",
+            action,
+            len(repos_to_sync),
+            account,
+        )
+        if repos_to_sync:
+            background_tasks.add_task(
+                convex_client.sync_installation_repositories,
+                action=action,
+                repositories=repos_to_sync,
+            )
+
+    elif event_type == "installation_repositories":
+        action = payload.get("action", "")
+        account = (
+            payload.get("installation", {}).get("account", {}).get("login")
+            or payload.get("account", {}).get("login")
+            or "unknown"
+        )
+        repos_added = payload.get("repositories_added", [])
+        repos_removed = payload.get("repositories_removed", [])
+        
+        if repos_added:
+            added_list = [
+                {
+                    "name": r.get("name") or r.get("full_name", "").split("/")[-1],
+                    "owner": (
+                        r.get("full_name", "").split("/")[0]
+                        if "/" in r.get("full_name", "")
+                        else account
+                    ),
+                    "githubRepoId": str(r.get("id")),
+                }
+                for r in repos_added
+                if r.get("id")
+            ]
+            background_tasks.add_task(
+                convex_client.sync_installation_repositories,
+                action="added",
+                repositories=added_list,
+            )
+
+        if repos_removed:
+            removed_list = [
+                {
+                    "name": r.get("name") or r.get("full_name", "").split("/")[-1],
+                    "owner": (
+                        r.get("full_name", "").split("/")[0]
+                        if "/" in r.get("full_name", "")
+                        else account
+                    ),
+                    "githubRepoId": str(r.get("id")),
+                }
+                for r in repos_removed
+                if r.get("id")
+            ]
+            background_tasks.add_task(
+                convex_client.sync_installation_repositories,
+                action="removed",
+                repositories=removed_list,
+            )
 
     elif event_type == "pull_request":
         # Handle PR events (opened, synchronized, closed)
@@ -111,7 +190,7 @@ async def github_webhook(request: Request, background_tasks: BackgroundTasks):
             return {"status": "ignored"}
         logger.info("Pull Request #%s action: %s on %s", pr_number, action, repo_name)
         if action in ("opened", "synchronize", "reopened", "ready_for_review"):
-            # Phase 3: Kick off the LangGraph pipeline in the background
+            # Kick off the LangGraph pipeline in the background
             background_tasks.add_task(
                 _scheduled_pipeline,
                 repo_name=repo_name,
