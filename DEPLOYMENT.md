@@ -57,8 +57,8 @@ This guide details the complete production deployment setup for **MergeMaster AI
    | Variable | Value / Description | Example |
    | --- | --- | --- |
    | `VITE_CONVEX_URL` | Your Convex Cloud deployment URL | `https://your-app.convex.cloud` |
-   | `VITE_WORKOS_CLIENT_ID` | Your WorkOS Client ID | `client_01J...` |
-   | `VITE_BACKEND_URL` | Your Render backend service URL | `https://mergemaster-backend.onrender.com` |
+   | `VITE_WORKOS_CLIENT_ID` | Your WorkOS Client ID | `client_YOUR_WORKOS_CLIENT_ID` |
+   | `VITE_BACKEND_URL` | Your Render backend service URL | `https://your-app.onrender.com` |
 
 5. Click **Deploy**.
 
@@ -70,12 +70,12 @@ This guide details the complete production deployment setup for **MergeMaster AI
 2. Connect your `MergeMasterAI` GitHub repository.
 3. Configure the service:
    - **Name**: `mergemaster-backend`
-   - **Region**: Select region closest to your users (e.g. `Oregon (US West)` or `Frankfurt`)
+   - **Region**: Select region closest to your users
    - **Branch**: `main`
    - **Root Directory**: `backend`
    - **Runtime**: `Docker`
    - **Dockerfile Path**: `./Dockerfile`
-   - **Instance Type**: `Starter` (or `Free` for testing)
+   - **Instance Type**: `Starter`
 4. Set Health Check Path:
    - **Health Check Path**: `/healthz`
 5. Add the following **Environment Variables** in Render:
@@ -84,10 +84,10 @@ This guide details the complete production deployment setup for **MergeMaster AI
    | --- | --- |
    | `PORT` | `8000` (or leave default, Render sets `$PORT`) |
    | `GITHUB_APP_ID` | Your GitHub App ID |
-   | `GITHUB_PRIVATE_KEY` | Your GitHub App Private Key PEM (including `-----BEGIN RSA PRIVATE KEY-----`) |
+   | `GITHUB_PRIVATE_KEY` | Your GitHub App Private Key PEM (securely loaded from environment) |
    | `GITHUB_WEBHOOK_SECRET` | The Webhook secret string configured in your GitHub App |
    | `CONVEX_URL` | Your Convex deployment URL (e.g. `https://your-app.convex.cloud`) |
-   | `CONVEX_ADMIN_KEY` | Convex Deploy Key (`Convex Dashboard > Project Settings > Deploy Keys`) |
+   | `CONVEX_ADMIN_KEY` | Convex Deploy Key (e.g. `prod:your-deploy-key`) |
    | `GEMINI_API_KEY` | Your Google Gemini API Key |
    | `LLM_API_BASE` | `https://generativelanguage.googleapis.com/v1beta/openai` |
    | `LLM_MODEL` | `gemini-3.5-flash-lite` |
@@ -153,11 +153,7 @@ Render free-tier instances spin down after 15 minutes of inactivity. To keep you
 ## 6. ⚡ Verifying the Deployment
 
 1. **Backend Health Check & Ping**:
-   Open `https://<your-render-backend>.onrender.com/ping` in your browser. You should receive:
-
-   ```json
-   { "status": "pong" }
-   ```
+   Open `https://<your-render-backend>.onrender.com/healthz` in your browser. You should receive status ok.
 
 2. **Frontend Test**:
    Log into your Vercel URL, view monitored repositories, and click **"Review with AI"** or open a test PR on GitHub.
