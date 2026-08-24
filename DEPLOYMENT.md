@@ -84,7 +84,7 @@ This guide details the complete production deployment setup for **MergeMaster AI
    | --- | --- |
    | `PORT` | `8000` (or leave default, Render sets `$PORT`) |
    | `GITHUB_APP_ID` | Your GitHub App ID |
-   | `GITHUB_PRIVATE_KEY` | Your GitHub App Private Key PEM (including `-----BEGIN RSA PRIVATE KEY-----`) |
+   | `GITHUB_PRIVATE_KEY` | Your GitHub App Private Key PEM (securely loaded from environment) |
    | `GITHUB_WEBHOOK_SECRET` | The Webhook secret string configured in your GitHub App |
    | `CONVEX_URL` | Your Convex deployment URL (e.g. `https://your-app.convex.cloud`) |
    | `CONVEX_ADMIN_KEY` | Convex Deploy Key (`Convex Dashboard > Project Settings > Deploy Keys`) |
