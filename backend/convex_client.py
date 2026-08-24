@@ -67,6 +67,22 @@ async def update_pull_request_analysis(
     return ok
 
 
+async def save_generated_tests(
+    *,
+    github_pr_id: str,
+    repo_name: str,
+    generated_tests: dict,
+) -> bool:
+    return await _call_mutation(
+        "pullRequests:saveGeneratedTests",
+        {
+            "github_pr_id": github_pr_id,
+            "repo_name": repo_name,
+            "generated_tests": generated_tests,
+        },
+    )
+
+
 async def log_analysis_decision(
     *,
     github_pr_id: str,
@@ -88,6 +104,22 @@ async def log_analysis_decision(
 async def get_routing_rules() -> list[dict] | None:
     """Fetch active routing rules from the Convex database."""
     res = await _call_query("routingRules:getRoutingRules", {})
+    if isinstance(res, list):
+        return res
+    return None
+
+
+async def get_custom_policies() -> list[dict] | None:
+    """Fetch active organizational coding policies from Convex."""
+    res = await _call_query("customPolicies:getActivePolicies", {})
+    if isinstance(res, list):
+        return res
+    return None
+
+
+async def get_past_decisions(repo_name: str) -> list[dict] | None:
+    """Fetch past review summaries for RAG context from Convex."""
+    res = await _call_query("embeddings:getPastDecisions", {"repo_name": repo_name})
     if isinstance(res, list):
         return res
     return None

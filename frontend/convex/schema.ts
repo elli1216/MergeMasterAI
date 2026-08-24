@@ -58,6 +58,7 @@ export default defineSchema({
     ai_summary: v.string(),
     full_review: v.optional(v.any()),
     markdown_report: v.optional(v.string()),
+    generated_tests: v.optional(v.any()),
     updated_at: v.number(),
   })
     .index('by_github_pr_id', ['github_pr_id'])
@@ -69,6 +70,39 @@ export default defineSchema({
     file_pattern: v.string(),
     reviewer_role: v.string(),
     auto_approve: v.boolean(),
+  }),
+
+  custom_policies: defineTable({
+    title: v.string(),
+    description: v.string(),
+    severity: v.union(
+      v.literal('critical'),
+      v.literal('high'),
+      v.literal('medium'),
+      v.literal('low'),
+    ),
+    is_active: v.boolean(),
+    created_at: v.number(),
+  }),
+
+  chat_messages: defineTable({
+    pr_id: v.id('pull_requests'),
+    sender: v.union(v.literal('user'), v.literal('ai')),
+    sender_name: v.string(),
+    message: v.string(),
+    created_at: v.number(),
+  }).index('by_pr_id', ['pr_id']),
+
+  pr_embeddings: defineTable({
+    pr_id: v.id('pull_requests'),
+    repo_name: v.string(),
+    summary: v.string(),
+    findings_summary: v.string(),
+    embedding: v.array(v.float64()),
+  }).vectorIndex('by_embedding', {
+    vectorField: 'embedding',
+    dimensions: 768,
+    filterFields: ['repo_name'],
   }),
 
   ai_decisions_log: defineTable({

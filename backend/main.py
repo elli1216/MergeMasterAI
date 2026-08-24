@@ -1,3 +1,4 @@
+import asyncio
 import hashlib
 import hmac
 import logging
@@ -8,7 +9,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 
 from agents.graph import run_pipeline
+import config
 import convex_client
+import github_client
+import llm_client
+import test_generator
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s %(levelname)s [%(name)s] %(message)s"
@@ -20,18 +25,19 @@ load_dotenv()
 
 app = FastAPI(title="MergeMaster AI Backend", version="1.0.0")
 
-# Allow the frontend dashboard (Vite dev server) to call the review endpoint.
+# Allow the frontend dashboard to call the API endpoints.
 CORS_ORIGINS = [
     origin.strip()
     for origin in os.getenv(
-        "CORS_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000"
+        "CORS_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000,https://*.vercel.app"
     ).split(",")
     if origin.strip()
 ]
 app.add_middleware(
     CORSMiddleware,
     allow_origins=CORS_ORIGINS,
-    allow_methods=["GET", "POST"],
+    allow_origin_regex=r"https://.*\.vercel\.app",
+    allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["*"],
 )
 
@@ -73,6 +79,24 @@ async def _scheduled_pipeline(**kwargs) -> None:
         logger.exception("pipeline run failed for %s", kwargs)
 
 
+@app.get("/")
+@app.get("/healthz")
+async def health_check():
+    """Health check endpoint for Render, Docker, and status monitors."""
+    return {
+        "status": "healthy",
+        "service": "mergemaster-ai-backend",
+        "version": "1.0.0",
+    }
+
+
+@app.get("/ping")
+@app.head("/ping")
+async def ping():
+    """Keep-alive endpoint for cron jobs and uptime monitors to prevent cold starts."""
+    return {"status": "pong"}
+
+
 @app.post("/api/webhooks/github")
 async def github_webhook(request: Request, background_tasks: BackgroundTasks):
     """
@@ -91,7 +115,7 @@ async def github_webhook(request: Request, background_tasks: BackgroundTasks):
 
     logger.info("GitHub event '%s' (delivery=%s)", event_type, delivery_id)
 
-    # 3. Handle specific events (Phase 2 Implementations)
+    # 3. Handle specific events
     if event_type == "installation":
         # Handle App installation (when a user adds/removes MergeMaster to/from a repository)
         action = payload.get("action", "")
@@ -206,11 +230,6 @@ async def github_webhook(request: Request, background_tasks: BackgroundTasks):
 async def run_review(request: Request):
     """
     On-demand AI review of a pull request, called by the frontend dashboard.
-
-    Body: { "repo_name": "owner/repo", "pr_number": 12, "github_token": "<optional user OAuth token>" }
-
-    Runs the same LangGraph pipeline as the webhook path and returns the full
-    review (findings, risk score, decision, routed reviewers).
     """
     body = await request.json()
     repo_name = (body.get("repo_name") or "").strip()
@@ -243,8 +262,143 @@ async def run_review(request: Request):
     }
 
 
+@app.post("/api/chat")
+async def chat_about_pr(request: Request):
+    """
+    Interactive PR Q&A Copilot endpoint.
+    Body: { "repo_name": "owner/repo", "pr_number": 12, "question": "...", "github_token": "..." }
+    """
+    body = await request.json()
+    repo_name = (body.get("repo_name") or "").strip()
+    pr_number = body.get("pr_number")
+    question = (body.get("question") or "").strip()
+    github_token = body.get("github_token") or None
+
+    if not repo_name or not isinstance(pr_number, int) or not question:
+        raise HTTPException(
+            status_code=422, detail="repo_name, pr_number, and question are required"
+        )
+
+    owner, repo = repo_name.split("/", 1)
+    diff_data = await asyncio.to_thread(
+        github_client.fetch_pr_diff, owner, repo, pr_number, github_token
+    )
+    diff_str = diff_data.get("diff", "") if diff_data else "Diff not available."
+
+    system_prompt = (
+        "You are MergeMaster AI's Interactive PR Copilot (IBM AI Builders Challenge).\n"
+        "You help software engineers and managers understand pull request risks, findings, and remediation.\n"
+        "Be concise, technical, direct, and reference code specifics when answering.\n"
+        f"Pull Request: {repo_name} #{pr_number}\n\n"
+        f"Diff Context:\n{diff_str[:30000]}"
+    )
+
+    if not (config.LLM_API_BASE and config.GEMINI_API_KEY):
+        return {
+            "answer": (
+                f"MergeMaster AI Copilot (offline mode): PR #{pr_number} on {repo_name} "
+                f"contains {len(diff_str)} characters of diff. Connect GEMINI_API_KEY for dynamic LLM reasoning."
+            )
+        }
+
+    try:
+        answer = await llm_client.chat_completions(
+            system=system_prompt,
+            user=question,
+            temperature=0.3,
+        )
+        return {"answer": answer}
+    except Exception as exc:
+        logger.warning("chat completions failed: %s", exc)
+        return {"answer": f"Unable to generate response: {exc}"}
+
+
+@app.post("/api/generate-tests")
+async def generate_pr_tests(request: Request):
+    """
+    Generate unit tests for a pull request.
+    Body: { "repo_name": "owner/repo", "pr_number": 12, "title": "...", "github_token": "..." }
+    """
+    body = await request.json()
+    repo_name = (body.get("repo_name") or "").strip()
+    pr_number = body.get("pr_number")
+    github_token = body.get("github_token") or None
+
+    if not repo_name or not isinstance(pr_number, int):
+        raise HTTPException(
+            status_code=422, detail="repo_name and pr_number are required"
+        )
+
+    owner, repo = repo_name.split("/", 1)
+    diff_data = await asyncio.to_thread(
+        github_client.fetch_pr_diff, owner, repo, pr_number, github_token
+    )
+    if not diff_data:
+        raise HTTPException(status_code=404, detail="Failed to fetch PR diff")
+
+    tests = await test_generator.generate_tests(
+        pr_title=diff_data.get("title") or body.get("title") or "",
+        diff=diff_data.get("diff", ""),
+        files=diff_data.get("files", []),
+    )
+    if not tests:
+        raise HTTPException(status_code=500, detail="Test generation failed")
+
+    # Save to Convex pull_requests record
+    await convex_client.save_generated_tests(
+        github_pr_id=str(pr_number),
+        repo_name=repo_name,
+        generated_tests=tests.model_dump(),
+    )
+
+    return tests.model_dump()
+
+
+@app.post("/api/push-tests")
+async def push_pr_tests(request: Request):
+    """
+    Push generated unit tests directly to the PR branch.
+    Body: { "repo_name": "owner/repo", "pr_number": 12, "test_file_path": "...", "test_code": "...", "github_token": "..." }
+    """
+    body = await request.json()
+    repo_name = (body.get("repo_name") or "").strip()
+    pr_number = body.get("pr_number")
+    test_file_path = (body.get("test_file_path") or "").strip()
+    test_code = body.get("test_code") or ""
+    github_token = body.get("github_token") or None
+
+    if (
+        not repo_name
+        or not isinstance(pr_number, int)
+        or not test_file_path
+        or not test_code
+    ):
+        raise HTTPException(
+            status_code=422,
+            detail="repo_name, pr_number, test_file_path, and test_code are required",
+        )
+
+    owner, repo = repo_name.split("/", 1)
+    diff_data = await asyncio.to_thread(
+        github_client.fetch_pr_diff, owner, repo, pr_number, github_token
+    )
+    head_ref = diff_data.get("head_ref") if diff_data else None
+    if not head_ref:
+        raise HTTPException(status_code=404, detail="Failed to locate PR head ref")
+
+    commit_sha, msg = await asyncio.to_thread(
+        test_generator.push_test_commit,
+        repo_name=repo_name,
+        head_ref=head_ref,
+        test_file_path=test_file_path,
+        test_code=test_code,
+        github_token=github_token,
+    )
+    return {"commit_sha": commit_sha, "message": msg}
+
+
 if __name__ == "__main__":
     import uvicorn
 
-    # Run the server on port 8000
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+    port = int(os.getenv("PORT", "8000"))
+    uvicorn.run("main:app", host="0.0.0.0", port=port, reload=False)

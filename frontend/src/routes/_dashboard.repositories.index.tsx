@@ -6,6 +6,7 @@ import { api } from '../../convex/_generated/api'
 
 import { RepositorySidebar as RepositoriesView } from '~/components/dashboard/repositorySidebar'
 import { RoutingRulesPanel } from '~/components/dashboard/routingRulesPanel'
+import { PoliciesPanel } from '~/components/dashboard/policiesPanel'
 
 export const Route = createFileRoute('/_dashboard/repositories/')({
   component: RepositoriesPage,
@@ -53,6 +54,8 @@ function RepositoriesPage() {
         </div>
 
         <RoutingRulesPanel />
+
+        <PoliciesPanel />
       </div>
     </>
   )

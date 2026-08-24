@@ -3,6 +3,8 @@ import logging
 
 import convex_client
 import github_client
+import llm_client
+import rag_memory
 from committer_agent import apply_fixes, draft_fixes
 from analysis import analyze
 from routing_rules import RoutingRule, route_files
@@ -56,8 +58,35 @@ async def analyze_changes(state: PipelineState) -> PipelineState:
             "ai_summary": "Merge conflicts detected. Please resolve conflicts before AI review.",
         }
 
+    # Parallel async retrieval of organizational policies and semantic RAG memory
+    policies = None
+    historical_context = None
+    try:
+        policies_task = convex_client.get_custom_policies()
+        rag_task = rag_memory.get_historical_context(
+            repo_name=state["repo_name"],
+            current_pr_title=state.get("title", ""),
+            current_files=state.get("files", []),
+        )
+        policies, historical_context = await asyncio.gather(
+            policies_task, rag_task, return_exceptions=True
+        )
+        if isinstance(policies, Exception):
+            logger.warning("policies retrieval error: %s", policies)
+            policies = None
+        if isinstance(historical_context, Exception):
+            logger.warning("historical context error: %s", historical_context)
+            historical_context = None
+    except Exception as exc:
+        logger.warning("failed to fetch policies or RAG memory context: %s", exc)
+
     result = await analyze(
-        state.get("title", ""), state.get("author", ""), state["diff"], state["files"]
+        state.get("title", ""),
+        state.get("author", ""),
+        state["diff"],
+        state["files"],
+        policies=policies,
+        historical_context=historical_context,
     )
     return {
         **state,

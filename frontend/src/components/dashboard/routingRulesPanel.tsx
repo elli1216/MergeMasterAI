@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useMutation, useQuery } from 'convex/react'
-import { Plus, Trash2, Sparkles, Check, X, ShieldCheck } from 'lucide-react'
+import { Plus, Trash2, Sparkles, Filter, X } from 'lucide-react'
 import { api } from '../../../convex/_generated/api'
 import type { Id } from '../../../convex/_generated/dataModel'
 import { Card, CardContent } from '~/components/ui/card'
@@ -8,11 +8,19 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '~
 import { Badge } from '~/components/ui/badge'
 import { Button } from '~/components/ui/button'
 
+type RuleItem = {
+  _id: Id<'routing_rules'>
+  _creationTime: number
+  file_pattern: string
+  reviewer_role: string
+  auto_approve?: boolean
+}
+
 export function RoutingRulesPanel() {
-  const rules = useQuery(api.routingRules.getRoutingRules) || []
-  const createRule = useMutation(api.routingRules.createRoutingRule)
-  const deleteRule = useMutation(api.routingRules.deleteRoutingRule)
-  const seedRules = useMutation(api.routingRules.seedDefaultRoutingRules)
+  const rules = (useQuery(api.pullRequests.getRoutingRules) || []) as Array<RuleItem>
+  const createRule = useMutation(api.pullRequests.createRoutingRule)
+  const deleteRule = useMutation(api.pullRequests.deleteRoutingRule)
+  const seedRules = useMutation(api.pullRequests.seedDefaultRoutingRules)
 
   const [isAdding, setIsAdding] = useState(false)
   const [filePattern, setFilePattern] = useState('')
@@ -52,11 +60,11 @@ export function RoutingRulesPanel() {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4">
         <div>
           <h2 className="text-lg md:text-xl font-bold text-white uppercase tracking-wider flex items-center gap-2">
-            <ShieldCheck className="w-5 h-5 text-zinc-400" />
+            <Filter className="w-5 h-5 text-zinc-400" />
             Reviewer Routing Rules
           </h2>
           <p className="text-zinc-500 font-mono text-xs md:text-sm">
-            Configure automatic reviewer role assignments and auto-approval policies
+            Map touched file patterns to designated domain expert reviewer roles
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -69,7 +77,7 @@ export function RoutingRulesPanel() {
               className="border-zinc-700 bg-zinc-950 hover:bg-white hover:text-black text-zinc-300 rounded-none font-mono text-xs uppercase tracking-wider"
             >
               <Sparkles className="w-3.5 h-3.5 mr-1.5" />
-              {seeding ? 'Seeding...' : 'Load Default Rules'}
+              {seeding ? 'Seeding...' : 'Load Standard Rules'}
             </Button>
           )}
           <Button
@@ -88,48 +96,49 @@ export function RoutingRulesPanel() {
           <form onSubmit={handleAddRule} className="grid grid-cols-1 sm:grid-cols-4 gap-4 items-end">
             <div className="space-y-1">
               <label className="text-[10px] font-mono uppercase tracking-widest text-zinc-400">
-                File Pattern (Glob)
+                File Pattern / Glob
               </label>
               <input
                 type="text"
-                placeholder="e.g. *.sql, src/api/*"
+                placeholder="e.g. *.sql or src/auth/*"
                 value={filePattern}
                 onChange={(e) => setFilePattern(e.target.value)}
                 required
                 className="w-full bg-zinc-900 border border-zinc-800 text-white font-mono text-xs p-2.5 rounded-none focus:outline-none focus:border-zinc-500"
               />
             </div>
-            <div className="space-y-1 sm:col-span-2">
+            <div className="space-y-1">
               <label className="text-[10px] font-mono uppercase tracking-widest text-zinc-400">
-                Assigned Reviewer Role
+                Designated Reviewer Role
               </label>
               <input
                 type="text"
-                placeholder="e.g. Database Architect, Lead Security Engineer"
+                placeholder="e.g. Security Lead, DBA"
                 value={reviewerRole}
                 onChange={(e) => setReviewerRole(e.target.value)}
                 required
                 className="w-full bg-zinc-900 border border-zinc-800 text-white font-mono text-xs p-2.5 rounded-none focus:outline-none focus:border-zinc-500"
               />
             </div>
-            <div className="flex items-center gap-4">
-              <label className="flex items-center gap-2 cursor-pointer text-xs font-mono text-zinc-300">
-                <input
-                  type="checkbox"
-                  checked={autoApprove}
-                  onChange={(e) => setAutoApprove(e.target.checked)}
-                  className="rounded border-zinc-800 bg-zinc-900 text-white"
-                />
-                Auto-approve
+            <div className="flex items-center space-x-2 py-3">
+              <input
+                type="checkbox"
+                id="autoApprove"
+                checked={autoApprove}
+                onChange={(e) => setAutoApprove(e.target.checked)}
+                className="rounded-none bg-zinc-900 border-zinc-700 text-white focus:ring-0"
+              />
+              <label htmlFor="autoApprove" className="text-xs font-mono text-zinc-300 cursor-pointer">
+                Auto-approve safe files
               </label>
-              <Button
-                type="submit"
-                size="sm"
-                className="bg-white text-black hover:bg-zinc-200 rounded-none font-mono text-xs uppercase tracking-wider ml-auto"
-              >
-                Save
-              </Button>
             </div>
+            <Button
+              type="submit"
+              size="sm"
+              className="bg-white text-black hover:bg-zinc-200 rounded-none font-mono text-xs uppercase tracking-wider"
+            >
+              Save Rule
+            </Button>
           </form>
         </Card>
       )}
@@ -141,13 +150,13 @@ export function RoutingRulesPanel() {
               <TableHeader className="bg-zinc-900 border-b border-zinc-800">
                 <TableRow className="border-none hover:bg-transparent">
                   <TableHead className="text-zinc-400 font-mono text-xs uppercase tracking-wider py-4">
-                    Pattern
+                    File Pattern
                   </TableHead>
                   <TableHead className="text-zinc-400 font-mono text-xs uppercase tracking-wider py-4">
-                    Assigned Role
+                    Reviewer Role
                   </TableHead>
                   <TableHead className="text-zinc-400 font-mono text-xs uppercase tracking-wider py-4">
-                    Auto-Approve
+                    Decision Behavior
                   </TableHead>
                   <TableHead className="text-right text-zinc-400 font-mono text-xs uppercase tracking-wider py-4">
                     Action
@@ -155,25 +164,24 @@ export function RoutingRulesPanel() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {rules.map((rule) => (
+                {rules.map((rule: RuleItem) => (
                   <TableRow
                     key={rule._id}
                     className="border-b border-zinc-800 hover:bg-zinc-900/50 transition-colors"
                   >
-                    <TableCell className="font-mono text-white text-xs font-bold">
-                      <code>{rule.file_pattern}</code>
+                    <TableCell className="font-mono text-xs text-white">
+                      <Badge variant="outline" className="rounded-none border-zinc-700 bg-zinc-900 font-mono text-xs">
+                        {rule.file_pattern}
+                      </Badge>
                     </TableCell>
-                    <TableCell className="font-sans text-zinc-300 text-sm">{rule.reviewer_role}</TableCell>
-                    <TableCell>
+                    <TableCell className="font-mono text-xs text-zinc-300">
+                      {rule.reviewer_role}
+                    </TableCell>
+                    <TableCell className="font-mono text-xs">
                       {rule.auto_approve ? (
-                        <Badge
-                          variant="outline"
-                          className="rounded-none font-mono text-[9px] uppercase tracking-wider border-green-500/50 text-green-400 bg-green-950/20"
-                        >
-                          <Check className="w-3 h-3 mr-1 inline" /> Enabled
-                        </Badge>
+                        <span className="text-green-400">Auto-Approve</span>
                       ) : (
-                        <span className="font-mono text-xs text-zinc-600">Manual review</span>
+                        <span className="text-amber-400">Requires Review</span>
                       )}
                     </TableCell>
                     <TableCell className="text-right">
