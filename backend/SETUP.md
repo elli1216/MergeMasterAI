@@ -1,6 +1,6 @@
 # ⚡ MergeMaster AI - Backend Setup & Architecture Guide
 
-Welcome to the **MergeMaster AI Backend**! This service is built with **FastAPI**, **LangGraph**, and **Google Gemini** (with deterministic heuristics fallback) to autonomously analyze pull requests, enforce organizational policies, draft surgical bug/security fixes, generate unit tests, and provide interactive PR Copilot assistance for the **IBM AI Builders Challenge**.
+Welcome to the **MergeMaster AI Backend**! This service is built with **FastAPI**, **LangGraph**, and **IBM Granite** (with deterministic heuristics fallback) to autonomously analyze pull requests, enforce organizational policies, draft surgical bug/security fixes, generate unit tests, and provide interactive PR Copilot assistance for the **IBM AI Builders Challenge**.
 
 ---
 
@@ -21,7 +21,7 @@ Welcome to the **MergeMaster AI Backend**! This service is built with **FastAPI*
                               │       analyze_changes            │
                               │ • Semantic RAG Memory            │
                               │ • Active Organizational Policies │
-                              │ • Google Gemini LLM / Heuristics │
+                              │ • IBM Granite LLM / Heuristics   │
                               └────────────────┬─────────────────┘
                                                │
                                                ▼
@@ -75,10 +75,10 @@ GITHUB_WEBHOOK_SECRET=your_generated_webhook_secret_here
 CONVEX_URL=https://your-app.convex.cloud
 CONVEX_ADMIN_KEY=prod:your-deploy-key
 
-# 3. LLM Intelligence (Google Gemini)
-GEMINI_API_KEY=AIzaSy...
-LLM_API_BASE=https://generativelanguage.googleapis.com/v1beta/openai
-LLM_MODEL=gemini-3.5-flash-lite
+# 3. LLM Intelligence (IBM Granite / watsonx.ai)
+WATSONX_API_KEY=your_ibm_api_key_here
+LLM_API_BASE=https://us-south.ml.cloud.ibm.com
+LLM_MODEL=ibm-granite-13b-chat-v2
 
 # 4. CORS & Server Settings
 CORS_ORIGINS=http://localhost:3000,http://127.0.0.1:3000,https://your-app.vercel.app
@@ -91,7 +91,7 @@ PORT=8000
 - **`GITHUB_PRIVATE_KEY`**: GitHub App General tab > Scroll to **Private keys** > **Generate a private key** (downloads `.pem` file).
 - **`GITHUB_WEBHOOK_SECRET`**: A random secret string you generate and paste into both GitHub App Webhook Settings and `.env`.
 - **`CONVEX_ADMIN_KEY`**: Convex Dashboard > Project Settings > **Deploy Keys**.
-- **`GEMINI_API_KEY`**: Google AI Studio / Gemini API key dashboard.
+- **`GEMINI_API_KEY`**: API key for your IBM watsonx.ai / Granite or LLM provider endpoint.
 
 ---
 

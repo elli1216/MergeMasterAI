@@ -134,7 +134,7 @@ _Focus: Extending autonomy, operational depth, and developer experience._
 **How it works:** Embed past merged PRs and bug reports into a vector database (Convex supports vector search). When a new PR is opened, the Analyst queries similar past PRs to warn about recurring bugs.
 **Technical Architecture:**
 **Database:** Expand `frontend/convex/schema.ts` to include a `vector` index on a new `pr_embeddings` table.
-**Backend:** During the `analyze_changes` node in LangGraph, add a step to query Convex for semantically similar PR histories. Inject these past learnings into the system prompt for the IBM/Gemini model before it generates the current PR's risk score.
+**Backend:** During the `analyze_changes` node in LangGraph, add a step to query Convex for semantically similar PR histories. Inject these past learnings into the system prompt for the IBM Granite model before it generates the current PR's risk score.
 
 #### 4. Custom Organizational Policies (No-Code Rules Engine) 🛡️
 

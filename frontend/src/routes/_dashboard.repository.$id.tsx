@@ -9,8 +9,13 @@ import type { ReviewTarget } from '~/components/dashboard'
 import type { AiReview } from '~/lib/backend'
 import type { Id } from '../../convex/_generated/dataModel'
 import { requestAiReview } from '~/lib/backend'
-import { AiReviewDialog, BranchesPanel, CommitsPanel, PullRequestsPanel } from '~/components/dashboard'
-
+import {
+  AiReviewDialog,
+  BranchesPanel,
+  CommitsPanel,
+  PullRequestsPanel,
+} from '~/components/dashboard'
+import Loading from '~/components/common/Loading'
 
 export const Route = createFileRoute('/_dashboard/repository/$id')({
   component: RepositoryDetailPage,
@@ -21,7 +26,11 @@ function RepositoryDetailPage() {
   const { id } = Route.useParams()
 
   // Note: we have to cast id to Id<'repositories'> for Convex typing
-  const { data } = useSuspenseQuery(convexQuery(api.repositories.getRepositoryDetails, { repositoryId: id as Id<'repositories'> }))
+  const { data } = useSuspenseQuery(
+    convexQuery(api.repositories.getRepositoryDetails, {
+      repositoryId: id as Id<'repositories'>,
+    }),
+  )
   const { repo, prs, commits, branches } = data
 
   const [reviewTarget, setReviewTarget] = useState<ReviewTarget | null>(null)
@@ -31,11 +40,7 @@ function RepositoryDetailPage() {
   const [reviewOpen, setReviewOpen] = useState(false)
 
   if (isLoading) {
-    return (
-      <div className="min-h-screen bg-black flex items-center justify-center">
-        <div className="text-white font-mono uppercase tracking-widest text-xs animate-pulse">Loading System...</div>
-      </div>
-    )
+    return <Loading />
   }
 
   if (!user) {
@@ -85,7 +90,10 @@ function RepositoryDetailPage() {
     setReviewError(null)
     setReviewing(true)
     try {
-      const result = await requestAiReview(reviewTarget.repoName, reviewTarget.prNumber)
+      const result = await requestAiReview(
+        reviewTarget.repoName,
+        reviewTarget.prNumber,
+      )
       setReview(result)
     } catch (err) {
       setReviewError(err instanceof Error ? err.message : String(err))
@@ -98,13 +106,20 @@ function RepositoryDetailPage() {
     <>
       <div className="space-y-8">
         <div>
-          <Link to="/repositories" className="text-zinc-500 hover:text-white flex items-center gap-2 font-mono text-xs uppercase tracking-widest mb-6 transition-colors w-fit">
+          <Link
+            to="/repositories"
+            className="text-zinc-500 hover:text-white flex items-center gap-2 font-mono text-xs uppercase tracking-widest mb-6 transition-colors w-fit"
+          >
             <ChevronLeft size={16} />
             Back to Repositories
           </Link>
 
-          <h2 className="text-3xl font-light tracking-tighter text-white">{repo.name}</h2>
-          <p className="text-zinc-500 font-mono text-xs uppercase tracking-widest mt-2">{repo.owner}</p>
+          <h2 className="text-3xl font-light tracking-tighter text-white">
+            {repo.name}
+          </h2>
+          <p className="text-zinc-500 font-mono text-xs uppercase tracking-widest mt-2">
+            {repo.owner}
+          </p>
         </div>
 
         <div className="space-y-12">

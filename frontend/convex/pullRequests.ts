@@ -4,10 +4,7 @@ import { mutation, query } from './_generated/server'
 export const getActivePRs = query({
   args: {},
   handler: async (ctx) => {
-    return await ctx.db
-      .query('pull_requests')
-      .order('desc')
-      .take(50)
+    return await ctx.db.query('pull_requests').order('desc').take(50)
   },
 })
 
@@ -33,7 +30,8 @@ export const overrideDecision = mutation({
     await ctx.db.patch('pull_requests', args.prId, { status: args.status })
     await ctx.db.insert('ai_decisions_log', {
       pr_id: args.prId,
-      decision_type: args.status === 'approved' ? 'auto_approve' : 'block_merge',
+      decision_type:
+        args.status === 'approved' ? 'auto_approve' : 'block_merge',
       reasoning: args.reason,
       overridden_by: userId,
       created_at: Date.now(),
@@ -168,7 +166,8 @@ export const getAnalyzeHistory = query({
           }
         }
         const historicalReview = log.snapshot_review ?? pr?.full_review
-        const historicalScore = log.risk_score ?? historicalReview?.risk_score ?? pr?.risk_score ?? 0
+        const historicalScore =
+          log.risk_score ?? historicalReview?.risk_score ?? pr?.risk_score ?? 0
 
         return {
           ...log,
@@ -209,7 +208,8 @@ export const getPrHistoryTimeline = query({
           }
         }
         const historicalReview = log.snapshot_review ?? pr?.full_review
-        const historicalScore = log.risk_score ?? historicalReview?.risk_score ?? pr?.risk_score ?? 0
+        const historicalScore =
+          log.risk_score ?? historicalReview?.risk_score ?? pr?.risk_score ?? 0
 
         return {
           ...log,
@@ -230,13 +230,41 @@ export const getPrHistoryTimeline = query({
 // --- Routing Rules Functions ---
 
 export const DEFAULT_RULES = [
-  { file_pattern: 'schema.prisma', reviewer_role: 'Lead Backend Engineer', auto_approve: false },
-  { file_pattern: '*.prisma', reviewer_role: 'Lead Backend Engineer', auto_approve: false },
-  { file_pattern: '*.sql', reviewer_role: 'Database Engineer', auto_approve: false },
-  { file_pattern: '*.py', reviewer_role: 'Backend Engineer', auto_approve: false },
-  { file_pattern: '*.ts', reviewer_role: 'Backend Engineer', auto_approve: false },
-  { file_pattern: '*.tsx', reviewer_role: 'Frontend Engineer', auto_approve: false },
-  { file_pattern: '*.js', reviewer_role: 'Frontend Engineer', auto_approve: false },
+  {
+    file_pattern: 'schema.prisma',
+    reviewer_role: 'Lead Backend Engineer',
+    auto_approve: false,
+  },
+  {
+    file_pattern: '*.prisma',
+    reviewer_role: 'Lead Backend Engineer',
+    auto_approve: false,
+  },
+  {
+    file_pattern: '*.sql',
+    reviewer_role: 'Database Engineer',
+    auto_approve: false,
+  },
+  {
+    file_pattern: '*.py',
+    reviewer_role: 'Backend Engineer',
+    auto_approve: false,
+  },
+  {
+    file_pattern: '*.ts',
+    reviewer_role: 'Backend Engineer',
+    auto_approve: false,
+  },
+  {
+    file_pattern: '*.tsx',
+    reviewer_role: 'Frontend Engineer',
+    auto_approve: false,
+  },
+  {
+    file_pattern: '*.js',
+    reviewer_role: 'Frontend Engineer',
+    auto_approve: false,
+  },
   { file_pattern: '*.css', reviewer_role: 'UI/UX Lead', auto_approve: true },
   { file_pattern: '*.md', reviewer_role: 'Docs Reviewer', auto_approve: true },
   { file_pattern: '*.txt', reviewer_role: 'Docs Reviewer', auto_approve: true },
@@ -288,25 +316,29 @@ export const seedDefaultRoutingRules = mutation({
 export const DEFAULT_POLICIES = [
   {
     title: 'Disallow Hardcoded Credentials',
-    description: 'Ensure API keys, tokens, passwords, and private secrets are not committed; use environment variables.',
+    description:
+      'Ensure API keys, tokens, passwords, and private secrets are not committed; use environment variables.',
     severity: 'critical' as const,
     is_active: true,
   },
   {
     title: 'Sanitize Database Queries',
-    description: 'Prevent raw string interpolation in SQL queries to prevent SQL Injection vulnerabilities.',
+    description:
+      'Prevent raw string interpolation in SQL queries to prevent SQL Injection vulnerabilities.',
     severity: 'critical' as const,
     is_active: true,
   },
   {
     title: 'Strict Input Validation',
-    description: 'Validate and schema-check external input parameters on all newly created API endpoints.',
+    description:
+      'Validate and schema-check external input parameters on all newly created API endpoints.',
     severity: 'high' as const,
     is_active: true,
   },
   {
     title: 'Safe Async Exception Handling',
-    description: 'All async background tasks and API handlers must catch exceptions and avoid unhandled promise rejections.',
+    description:
+      'All async background tasks and API handlers must catch exceptions and avoid unhandled promise rejections.',
     severity: 'medium' as const,
     is_active: true,
   },
@@ -384,6 +416,99 @@ export const seedDefaultPolicies = mutation({
   },
 })
 
+export const updatePolicy = mutation({
+  args: {
+    policyId: v.id('custom_policies'),
+    title: v.string(),
+    description: v.string(),
+    severity: v.union(
+      v.literal('critical'),
+      v.literal('high'),
+      v.literal('medium'),
+      v.literal('low'),
+    ),
+    is_active: v.optional(v.boolean()),
+  },
+  handler: async (ctx, args) => {
+    await ctx.db.patch('custom_policies', args.policyId, {
+      title: args.title.trim(),
+      description: args.description.trim(),
+      severity: args.severity,
+      ...(args.is_active !== undefined ? { is_active: args.is_active } : {}),
+    })
+  },
+})
+
+export const importPolicies = mutation({
+  args: {
+    policies: v.array(
+      v.object({
+        title: v.string(),
+        description: v.string(),
+        severity: v.union(
+          v.literal('critical'),
+          v.literal('high'),
+          v.literal('medium'),
+          v.literal('low'),
+        ),
+        is_active: v.optional(v.boolean()),
+      }),
+    ),
+    mode: v.optional(v.union(v.literal('append'), v.literal('replace'))),
+  },
+  handler: async (ctx, args) => {
+    const mode = args.mode ?? 'append'
+    if (mode === 'replace') {
+      const existing = await ctx.db.query('custom_policies').collect()
+      for (const item of existing) {
+        await ctx.db.delete('custom_policies', item._id)
+      }
+    }
+
+    let importedCount = 0
+    let skippedCount = 0
+    const existingPolicies =
+      mode === 'append' ? await ctx.db.query('custom_policies').collect() : []
+    const existingTitles = new Set(
+      existingPolicies.map((p) => p.title.trim().toLowerCase()),
+    )
+
+    for (const item of args.policies) {
+      const normTitle = item.title.trim().toLowerCase()
+      if (mode === 'append' && existingTitles.has(normTitle)) {
+        skippedCount++
+        continue
+      }
+      await ctx.db.insert('custom_policies', {
+        title: item.title.trim(),
+        description: item.description.trim(),
+        severity: item.severity,
+        is_active: item.is_active ?? true,
+        created_at: Date.now(),
+      })
+      existingTitles.add(normTitle)
+      importedCount++
+    }
+
+    return {
+      imported: importedCount,
+      skipped: skippedCount,
+      total: args.policies.length,
+    }
+  },
+})
+
+export const clearAllPolicies = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const all = await ctx.db.query('custom_policies').collect()
+    for (const item of all) {
+      await ctx.db.delete('custom_policies', item._id)
+    }
+    return { deleted: all.length }
+  },
+})
+
 // --- Analytics Functions ---
 
 export const getAnalyticsSummary = query({
@@ -399,18 +524,32 @@ export const getAnalyticsSummary = query({
     const pendingCount = prs.filter((p) => p.status === 'pending').length
     const mergedCount = prs.filter((p) => p.status === 'merged').length
 
-    const autoApproveDecisions = logs.filter((l) => l.decision_type === 'auto_approve').length
-    const remediationsDecisions = logs.filter((l) => l.decision_type === 'remediate_code').length
-    const blockDecisions = logs.filter((l) => l.decision_type === 'block_merge').length
-    const routeDecisions = logs.filter((l) => l.decision_type === 'route_reviewer').length
+    const autoApproveDecisions = logs.filter(
+      (l) => l.decision_type === 'auto_approve',
+    ).length
+    const remediationsDecisions = logs.filter(
+      (l) => l.decision_type === 'remediate_code',
+    ).length
+    const blockDecisions = logs.filter(
+      (l) => l.decision_type === 'block_merge',
+    ).length
+    const routeDecisions = logs.filter(
+      (l) => l.decision_type === 'route_reviewer',
+    ).length
 
     const estimatedHoursSaved = Number(
-      (autoApproveDecisions * 1.5 + remediationsDecisions * 2.0 + totalPRs * 0.5).toFixed(1),
+      (
+        autoApproveDecisions * 1.5 +
+        remediationsDecisions * 2.0 +
+        totalPRs * 0.5
+      ).toFixed(1),
     )
 
     const avgRiskScore =
       totalPRs > 0
-        ? Math.round(prs.reduce((acc, p) => acc + (p.risk_score || 0), 0) / totalPRs)
+        ? Math.round(
+            prs.reduce((acc, p) => acc + (p.risk_score || 0), 0) / totalPRs,
+          )
         : 0
 
     const categoryCounts: Record<string, number> = {
@@ -440,10 +579,27 @@ export const getAnalyticsSummary = query({
       }
     }
 
-    const riskDistribution: Array<{ range: string; count: number; color: string }> = [
-      { range: '0-25% (Safe)', count: prs.filter((p) => p.risk_score <= 25).length, color: 'bg-green-500' },
-      { range: '26-75% (Medium)', count: prs.filter((p) => p.risk_score > 25 && p.risk_score <= 75).length, color: 'bg-amber-500' },
-      { range: '76-100% (Critical)', count: prs.filter((p) => p.risk_score > 75).length, color: 'bg-red-500' },
+    const riskDistribution: Array<{
+      range: string
+      count: number
+      color: string
+    }> = [
+      {
+        range: '0-25% (Safe)',
+        count: prs.filter((p) => p.risk_score <= 25).length,
+        color: 'bg-green-500',
+      },
+      {
+        range: '26-75% (Medium)',
+        count: prs.filter((p) => p.risk_score > 25 && p.risk_score <= 75)
+          .length,
+        color: 'bg-amber-500',
+      },
+      {
+        range: '76-100% (Critical)',
+        count: prs.filter((p) => p.risk_score > 75).length,
+        color: 'bg-red-500',
+      },
     ]
 
     return {
@@ -474,7 +630,9 @@ export const getPastDecisions = query({
   handler: async (ctx, args) => {
     const prs = await ctx.db
       .query('pull_requests')
-      .withIndex('by_repo_name_and_github_pr_id', (q) => q.eq('repo_name', args.repo_name))
+      .withIndex('by_repo_name_and_github_pr_id', (q) =>
+        q.eq('repo_name', args.repo_name),
+      )
       .order('desc')
       .take(10)
 

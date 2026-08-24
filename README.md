@@ -33,7 +33,7 @@ MergeMaster AI goes far beyond traditional "AI code reviewers." Instead of passi
                               │       analyze_changes            │
                               │ • Semantic RAG Memory            │
                               │ • Active Organizational Policies │
-                              │ • Google Gemini LLM / Heuristics │
+                              │ • IBM Granite LLM / Heuristics   │
                               └────────────────┬─────────────────┘
                                                │
                                                ▼
@@ -108,17 +108,13 @@ An executive dashboard calculating:
 - **Risk Confidence Tiers** (Safe 0–25%, Medium 26–75%, Critical 76–100%).
 - **Vulnerability Categorization** (Security, Logic, Bugs, Code Quality).
 
-### 8. 👤 Role-Based Access Control & Audited Overrides
-
-Managers can manually override blocked merge gates directly from the dashboard. Every override is strictly attributed to the logged-in user and recorded in the audit trail.
-
 ---
 
 ## 🏗️ Technology Stack
 
 | Layer | Technologies |
 | --- | --- |
-| **AI & Multi-Agent** | **LangGraph**, **Google Gemini** (Gemini 3.5 / 2.5), Pydantic Schemas, Deterministic Security Heuristics |
+| **AI & Multi-Agent** | **LangGraph**, **IBM Granite** (Granite 3.0 / 3.1 Code & Instruct), Pydantic Schemas, Deterministic Security Heuristics |
 | **Backend API** | **FastAPI**, **Uvicorn**, **PyGithub**, **HTTPX**, **Docker** |
 | **Real-Time Data Layer** | **Convex Cloud** (Live WebSocket Subscriptions, Reactive Mutations, Vector Storage) |
 | **Frontend** | **TanStack Start**, **TanStack Router**, **React 19**, **Tailwind CSS v4**, **Lucide Icons** |
@@ -134,7 +130,7 @@ Managers can manually override blocked merge gates directly from the dashboard. 
 - Python 3.10+ & Node.js 18+
 - [pnpm](https://pnpm.io/) (`npm i -g pnpm`)
 - GitHub App credentials & Convex Account
-- Google Gemini API Key
+- LLM API Key (IBM watsonx.ai / Granite or OpenAI-compatible endpoint)
 
 ### 1. Backend Setup
 

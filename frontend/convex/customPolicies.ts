@@ -99,3 +99,93 @@ export const seedDefaultPolicies = mutation({
     return { seeded: true, count: DEFAULT_POLICIES.length }
   },
 })
+
+export const updatePolicy = mutation({
+  args: {
+    policyId: v.id('custom_policies'),
+    title: v.string(),
+    description: v.string(),
+    severity: v.union(
+      v.literal('critical'),
+      v.literal('high'),
+      v.literal('medium'),
+      v.literal('low'),
+    ),
+    is_active: v.optional(v.boolean()),
+  },
+  handler: async (ctx, args) => {
+    await ctx.db.patch('custom_policies', args.policyId, {
+      title: args.title.trim(),
+      description: args.description.trim(),
+      severity: args.severity,
+      ...(args.is_active !== undefined ? { is_active: args.is_active } : {}),
+    })
+  },
+})
+
+export const importPolicies = mutation({
+  args: {
+    policies: v.array(
+      v.object({
+        title: v.string(),
+        description: v.string(),
+        severity: v.union(
+          v.literal('critical'),
+          v.literal('high'),
+          v.literal('medium'),
+          v.literal('low'),
+        ),
+        is_active: v.optional(v.boolean()),
+      }),
+    ),
+    mode: v.optional(v.union(v.literal('append'), v.literal('replace'))),
+  },
+  handler: async (ctx, args) => {
+    const mode = args.mode ?? 'append'
+    if (mode === 'replace') {
+      const existing = await ctx.db.query('custom_policies').collect()
+      for (const item of existing) {
+        await ctx.db.delete('custom_policies', item._id)
+      }
+    }
+
+    let importedCount = 0
+    let skippedCount = 0
+    const existingPolicies = mode === 'append' ? await ctx.db.query('custom_policies').collect() : []
+    const existingTitles = new Set(existingPolicies.map((p) => p.title.trim().toLowerCase()))
+
+    for (const item of args.policies) {
+      const normTitle = item.title.trim().toLowerCase()
+      if (mode === 'append' && existingTitles.has(normTitle)) {
+        skippedCount++
+        continue
+      }
+      await ctx.db.insert('custom_policies', {
+        title: item.title.trim(),
+        description: item.description.trim(),
+        severity: item.severity,
+        is_active: item.is_active ?? true,
+        created_at: Date.now(),
+      })
+      existingTitles.add(normTitle)
+      importedCount++
+    }
+
+    return {
+      imported: importedCount,
+      skipped: skippedCount,
+      total: args.policies.length,
+    }
+  },
+})
+
+export const clearAllPolicies = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const all = await ctx.db.query('custom_policies').collect()
+    for (const item of all) {
+      await ctx.db.delete('custom_policies', item._id)
+    }
+    return { deleted: all.length }
+  },
+})
