@@ -57,8 +57,8 @@ This guide details the complete production deployment setup for **MergeMaster AI
    | Variable | Value / Description | Example |
    | --- | --- | --- |
    | `VITE_CONVEX_URL` | Your Convex Cloud deployment URL | `https://your-app.convex.cloud` |
-   | `VITE_WORKOS_CLIENT_ID` | Your WorkOS Client ID | `client_01J...` |
-   | `VITE_BACKEND_URL` | Your Render backend service URL | `https://mergemaster-backend.onrender.com` |
+   | `VITE_WORKOS_CLIENT_ID` | Your WorkOS Client ID | `client_YOUR_WORKOS_CLIENT_ID` |
+   | `VITE_BACKEND_URL` | Your Render backend service URL | `https://your-app.onrender.com` |
 
 5. Click **Deploy**.
 
