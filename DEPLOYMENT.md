@@ -70,12 +70,12 @@ This guide details the complete production deployment setup for **MergeMaster AI
 2. Connect your `MergeMasterAI` GitHub repository.
 3. Configure the service:
    - **Name**: `mergemaster-backend`
-   - **Region**: Select region closest to your users (e.g. `Oregon (US West)` or `Frankfurt`)
+   - **Region**: Select region closest to your users
    - **Branch**: `main`
    - **Root Directory**: `backend`
    - **Runtime**: `Docker`
    - **Dockerfile Path**: `./Dockerfile`
-   - **Instance Type**: `Starter` (or `Free` for testing)
+   - **Instance Type**: `Starter`
 4. Set Health Check Path:
    - **Health Check Path**: `/healthz`
 5. Add the following **Environment Variables** in Render:
