@@ -1,5 +1,5 @@
 import { Link, useLocation } from '@tanstack/react-router'
-import { LayoutDashboard, FolderGit2, BarChart3, Menu, X, ExternalLink } from 'lucide-react'
+import { LayoutDashboard, FolderGit2, BarChart3, Menu, X, ExternalLink, Shield } from 'lucide-react'
 import { DashboardHeader } from '~/components/dashboard/dashboardHeader'
 import { useState } from 'react'
 
@@ -11,6 +11,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     { name: 'Dashboard', path: '/', icon: LayoutDashboard },
     { name: 'Codebases', path: '/repositories', icon: FolderGit2 },
     { name: 'Analytics & ROI', path: '/analytics', icon: BarChart3 },
+    { name: 'Policies', path: '/policies', icon: Shield },
   ]
 
   return (

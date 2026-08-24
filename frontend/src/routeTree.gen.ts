@@ -15,6 +15,7 @@ import { Route as CallbackRouteImport } from './routes/callback'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as DashboardIndexRouteImport } from './routes/_dashboard.index'
 import { Route as DashboardAnalyticsRouteImport } from './routes/_dashboard.analytics'
+import { Route as DashboardPoliciesRouteImport } from './routes/_dashboard.policies'
 import { Route as DashboardRepositoriesIndexRouteImport } from './routes/_dashboard.repositories.index'
 import { Route as DashboardRepositoryIdRouteImport } from './routes/_dashboard.repository.$id'
 
@@ -47,6 +48,11 @@ const DashboardAnalyticsRoute = DashboardAnalyticsRouteImport.update({
   path: '/analytics',
   getParentRoute: () => DashboardRoute,
 } as any)
+const DashboardPoliciesRoute = DashboardPoliciesRouteImport.update({
+  id: '/policies',
+  path: '/policies',
+  getParentRoute: () => DashboardRoute,
+} as any)
 const DashboardRepositoriesIndexRoute =
   DashboardRepositoriesIndexRouteImport.update({
     id: '/repositories/',
@@ -65,6 +71,7 @@ export interface FileRoutesByFullPath {
   '/callback': typeof CallbackRoute
   '/login': typeof LoginRoute
   '/analytics': typeof DashboardAnalyticsRoute
+  '/policies': typeof DashboardPoliciesRoute
   '/repository/$id': typeof DashboardRepositoryIdRoute
   '/repositories/': typeof DashboardRepositoriesIndexRoute
 }
@@ -73,6 +80,7 @@ export interface FileRoutesByTo {
   '/callback': typeof CallbackRoute
   '/login': typeof LoginRoute
   '/analytics': typeof DashboardAnalyticsRoute
+  '/policies': typeof DashboardPoliciesRoute
   '/': typeof DashboardIndexRoute
   '/repository/$id': typeof DashboardRepositoryIdRoute
   '/repositories': typeof DashboardRepositoriesIndexRoute
@@ -84,6 +92,7 @@ export interface FileRoutesById {
   '/callback': typeof CallbackRoute
   '/login': typeof LoginRoute
   '/_dashboard/analytics': typeof DashboardAnalyticsRoute
+  '/_dashboard/policies': typeof DashboardPoliciesRoute
   '/_dashboard/': typeof DashboardIndexRoute
   '/_dashboard/repository/$id': typeof DashboardRepositoryIdRoute
   '/_dashboard/repositories/': typeof DashboardRepositoriesIndexRoute
@@ -96,6 +105,7 @@ export interface FileRouteTypes {
     | '/callback'
     | '/login'
     | '/analytics'
+    | '/policies'
     | '/repository/$id'
     | '/repositories/'
   fileRoutesByTo: FileRoutesByTo
@@ -104,6 +114,7 @@ export interface FileRouteTypes {
     | '/callback'
     | '/login'
     | '/analytics'
+    | '/policies'
     | '/'
     | '/repository/$id'
     | '/repositories'
@@ -114,6 +125,7 @@ export interface FileRouteTypes {
     | '/callback'
     | '/login'
     | '/_dashboard/analytics'
+    | '/_dashboard/policies'
     | '/_dashboard/'
     | '/_dashboard/repository/$id'
     | '/_dashboard/repositories/'
@@ -170,6 +182,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardAnalyticsRouteImport
       parentRoute: typeof DashboardRoute
     }
+    '/_dashboard/policies': {
+      id: '/_dashboard/policies'
+      path: '/policies'
+      fullPath: '/policies'
+      preLoaderRoute: typeof DashboardPoliciesRouteImport
+      parentRoute: typeof DashboardRoute
+    }
     '/_dashboard/repositories/': {
       id: '/_dashboard/repositories/'
       path: '/repositories'
@@ -189,6 +208,7 @@ declare module '@tanstack/react-router' {
 
 interface DashboardRouteChildren {
   DashboardAnalyticsRoute: typeof DashboardAnalyticsRoute
+  DashboardPoliciesRoute: typeof DashboardPoliciesRoute
   DashboardIndexRoute: typeof DashboardIndexRoute
   DashboardRepositoryIdRoute: typeof DashboardRepositoryIdRoute
   DashboardRepositoriesIndexRoute: typeof DashboardRepositoriesIndexRoute
@@ -196,6 +216,7 @@ interface DashboardRouteChildren {
 
 const DashboardRouteChildren: DashboardRouteChildren = {
   DashboardAnalyticsRoute: DashboardAnalyticsRoute,
+  DashboardPoliciesRoute: DashboardPoliciesRoute,
   DashboardIndexRoute: DashboardIndexRoute,
   DashboardRepositoryIdRoute: DashboardRepositoryIdRoute,
   DashboardRepositoriesIndexRoute: DashboardRepositoriesIndexRoute,
