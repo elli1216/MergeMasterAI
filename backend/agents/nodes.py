@@ -3,9 +3,11 @@ import logging
 
 import convex_client
 import github_client
+import llm_client
+import rag_memory
 from committer_agent import apply_fixes, draft_fixes
 from analysis import analyze
-from routing_rules import route_files
+from routing_rules import RoutingRule, route_files
 from agents.state import PipelineState
 
 logger = logging.getLogger(__name__)
@@ -56,8 +58,35 @@ async def analyze_changes(state: PipelineState) -> PipelineState:
             "ai_summary": "Merge conflicts detected. Please resolve conflicts before AI review.",
         }
 
+    # Parallel async retrieval of organizational policies and semantic RAG memory
+    policies = None
+    historical_context = None
+    try:
+        policies_task = convex_client.get_custom_policies()
+        rag_task = rag_memory.get_historical_context(
+            repo_name=state["repo_name"],
+            current_pr_title=state.get("title", ""),
+            current_files=state.get("files", []),
+        )
+        policies, historical_context = await asyncio.gather(
+            policies_task, rag_task, return_exceptions=True
+        )
+        if isinstance(policies, Exception):
+            logger.warning("policies retrieval error: %s", policies)
+            policies = None
+        if isinstance(historical_context, Exception):
+            logger.warning("historical context error: %s", historical_context)
+            historical_context = None
+    except Exception as exc:
+        logger.warning("failed to fetch policies or RAG memory context: %s", exc)
+
     result = await analyze(
-        state.get("title", ""), state.get("author", ""), state["diff"], state["files"]
+        state.get("title", ""),
+        state.get("author", ""),
+        state["diff"],
+        state["files"],
+        policies=policies,
+        historical_context=historical_context,
     )
     return {
         **state,
@@ -69,7 +98,24 @@ async def analyze_changes(state: PipelineState) -> PipelineState:
 
 
 async def route_reviewers(state: PipelineState) -> PipelineState:
-    reviewers, docs_only = route_files(state.get("files", []))
+    # Attempt to load custom routing rules from Convex database
+    custom_rules = None
+    try:
+        db_rules = await convex_client.get_routing_rules()
+        if db_rules:
+            custom_rules = [
+                RoutingRule(
+                    file_pattern=r["file_pattern"],
+                    reviewer_role=r["reviewer_role"],
+                    auto_approve=r.get("auto_approve", False),
+                )
+                for r in db_rules
+                if "file_pattern" in r and "reviewer_role" in r
+            ]
+    except Exception as exc:
+        logger.warning("failed to fetch dynamic routing rules, falling back to defaults: %s", exc)
+
+    reviewers, docs_only = route_files(state.get("files", []), rules=custom_rules)
     decision = state["decision"]
     if decision == "auto_approve":
         status = APPROVED
