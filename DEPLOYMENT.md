@@ -87,7 +87,7 @@ This guide details the complete production deployment setup for **MergeMaster AI
    | `GITHUB_PRIVATE_KEY` | Your GitHub App Private Key PEM (securely loaded from environment) |
    | `GITHUB_WEBHOOK_SECRET` | The Webhook secret string configured in your GitHub App |
    | `CONVEX_URL` | Your Convex deployment URL (e.g. `https://your-app.convex.cloud`) |
-   | `CONVEX_ADMIN_KEY` | Convex Deploy Key (`Convex Dashboard > Project Settings > Deploy Keys`) |
+   | `CONVEX_ADMIN_KEY` | Convex Deploy Key (e.g. `prod:your-deploy-key`) |
    | `GEMINI_API_KEY` | Your Google Gemini API Key |
    | `LLM_API_BASE` | `https://generativelanguage.googleapis.com/v1beta/openai` |
    | `LLM_MODEL` | `gemini-3.5-flash-lite` |
