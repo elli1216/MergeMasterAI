@@ -153,11 +153,7 @@ Render free-tier instances spin down after 15 minutes of inactivity. To keep you
 ## 6. ⚡ Verifying the Deployment
 
 1. **Backend Health Check & Ping**:
-   Open `https://<your-render-backend>.onrender.com/ping` in your browser. You should receive:
-
-   ```json
-   { "status": "pong" }
-   ```
+   Open `https://<your-render-backend>.onrender.com/healthz` in your browser. You should receive status ok.
 
 2. **Frontend Test**:
    Log into your Vercel URL, view monitored repositories, and click **"Review with AI"** or open a test PR on GitHub.
