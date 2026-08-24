@@ -125,6 +125,9 @@ export const logAnalysisDecision = mutation({
       v.literal('auto_approve'),
     ),
     reasoning: v.string(),
+    risk_score: v.optional(v.number()),
+    status: v.optional(v.string()),
+    snapshot_review: v.optional(v.any()),
   },
   handler: async (ctx, args) => {
     const pr = await ctx.db
@@ -134,10 +137,17 @@ export const logAnalysisDecision = mutation({
       )
       .first()
     if (!pr) return
+
+    const snapshot = args.snapshot_review ?? pr.full_review
+    const riskScore = args.risk_score ?? pr.risk_score ?? snapshot?.risk_score
+
     await ctx.db.insert('ai_decisions_log', {
       pr_id: pr._id,
       decision_type: args.decision_type,
       reasoning: args.reasoning,
+      risk_score: riskScore,
+      status: args.status ?? pr.status,
+      snapshot_review: snapshot,
       created_at: Date.now(),
     })
   },
@@ -157,17 +167,63 @@ export const getAnalyzeHistory = query({
             overriddenByName = user.name || user.email
           }
         }
+        const historicalReview = log.snapshot_review ?? pr?.full_review
+        const historicalScore = log.risk_score ?? historicalReview?.risk_score ?? pr?.risk_score ?? 0
+
         return {
           ...log,
           pr_title: pr?.title || 'Unknown PR',
           repo_name: pr?.repo_name || 'Unknown Repo',
           github_pr_id: pr?.github_pr_id || '?',
-          full_review: pr?.full_review,
+          pr_author: pr?.author,
+          current_pr_status: pr?.status,
+          risk_score: historicalScore,
+          snapshot_review: historicalReview,
           overridden_by_name: overriddenByName,
         }
       }),
     )
     return enriched
+  },
+})
+
+export const getPrHistoryTimeline = query({
+  args: {
+    pr_id: v.id('pull_requests'),
+  },
+  handler: async (ctx, args) => {
+    const pr = await ctx.db.get(args.pr_id)
+    const logs = await ctx.db
+      .query('ai_decisions_log')
+      .withIndex('by_pr_id', (q) => q.eq('pr_id', args.pr_id))
+      .order('desc')
+      .collect()
+
+    return await Promise.all(
+      logs.map(async (log) => {
+        let overriddenByName: string | undefined = undefined
+        if (log.overridden_by) {
+          const user = await ctx.db.get(log.overridden_by)
+          if (user) {
+            overriddenByName = user.name || user.email
+          }
+        }
+        const historicalReview = log.snapshot_review ?? pr?.full_review
+        const historicalScore = log.risk_score ?? historicalReview?.risk_score ?? pr?.risk_score ?? 0
+
+        return {
+          ...log,
+          pr_title: pr?.title || 'Unknown PR',
+          repo_name: pr?.repo_name || 'Unknown Repo',
+          github_pr_id: pr?.github_pr_id || '?',
+          pr_author: pr?.author,
+          current_pr_status: pr?.status,
+          risk_score: historicalScore,
+          snapshot_review: historicalReview,
+          overridden_by_name: overriddenByName,
+        }
+      }),
+    )
   },
 })
 

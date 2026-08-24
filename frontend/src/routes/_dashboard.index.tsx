@@ -6,10 +6,11 @@ import { useAuth } from '@workos-inc/authkit-react'
 import { useEffect, useState } from 'react'
 import { api } from '../../convex/_generated/api'
 import type { Doc } from '../../convex/_generated/dataModel'
-import type {ReviewTarget} from '~/components/dashboard';
-import type {AiReview} from '~/lib/backend';
+import type { ReviewTarget, AnalysisHistoryRecord } from '~/components/dashboard';
+import type { AiReview } from '~/lib/backend';
 import {
   AiReviewDialog,
+  AnalysisHistoryDialog,
   AnalyzeHistoryPanel,
   CommitsPanel,
   PullRequestsPanel,
@@ -65,18 +66,20 @@ function Dashboard() {
   const { data: historyLogs } = useSuspenseQuery(convexQuery(api.pullRequests.getAnalyzeHistory, {}))
   const queryClient = useQueryClient()
 
+  // Live PR Review Dialog State
   const [reviewTarget, setReviewTarget] = useState<ReviewTarget | null>(null)
   const [review, setReview] = useState<AiReview | null>(null)
   const [reviewing, setReviewing] = useState(false)
   const [reviewError, setReviewError] = useState<string | null>(null)
   const [reviewOpen, setReviewOpen] = useState(false)
 
+  // Dedicated Historical Analysis State Modal
+  const [selectedHistoryRecord, setSelectedHistoryRecord] = useState<AnalysisHistoryRecord | null>(null)
+  const [historyDialogOpen, setHistoryDialogOpen] = useState(false)
+
   const handleViewHistory = (log: any) => {
-    setReviewTarget({ repoName: log.repo_name, prNumber: Number(log.github_pr_id), title: log.pr_title })
-    setReview(log.full_review || null)
-    setReviewError(null)
-    setReviewing(false)
-    setReviewOpen(true)
+    setSelectedHistoryRecord(log as AnalysisHistoryRecord)
+    setHistoryDialogOpen(true)
   }
 
   const handleReview = async (pr: Doc<'pull_requests'>) => {
@@ -142,6 +145,7 @@ function Dashboard() {
         <AnalyzeHistoryPanel logs={historyLogs} onView={handleViewHistory} />
       </div>
 
+      {/* Live PR Review Dialog */}
       <AiReviewDialog
         open={reviewOpen}
         onOpenChange={setReviewOpen}
@@ -150,6 +154,14 @@ function Dashboard() {
         loading={reviewing}
         error={reviewError}
         onReanalyze={handleReanalyze}
+      />
+
+      {/* Separate Dedicated Historical Analysis State Modal */}
+      <AnalysisHistoryDialog
+        open={historyDialogOpen}
+        onOpenChange={setHistoryDialogOpen}
+        record={selectedHistoryRecord}
+        allPrHistory={historyLogs as any}
       />
     </>
   )

@@ -89,15 +89,26 @@ async def log_analysis_decision(
     repo_name: str,
     decision_type: str,
     reasoning: str,
+    risk_score: int | None = None,
+    status: str | None = None,
+    snapshot_review: dict | None = None,
 ) -> bool:
+    payload = {
+        "github_pr_id": github_pr_id,
+        "repo_name": repo_name,
+        "decision_type": decision_type,
+        "reasoning": reasoning,
+    }
+    if risk_score is not None:
+        payload["risk_score"] = risk_score
+    if status is not None:
+        payload["status"] = status
+    if snapshot_review is not None:
+        payload["snapshot_review"] = snapshot_review
+
     return await _call_mutation(
         "pullRequests:logAnalysisDecision",
-        {
-            "github_pr_id": github_pr_id,
-            "repo_name": repo_name,
-            "decision_type": decision_type,
-            "reasoning": reasoning,
-        },
+        payload,
     )
 
 

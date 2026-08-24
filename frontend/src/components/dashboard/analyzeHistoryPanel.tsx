@@ -68,11 +68,10 @@ export function AnalyzeHistoryPanel({ logs, onView }: AnalyzeHistoryPanelProps) 
                 variant="outline"
                 size="sm"
                 onClick={() => onView(log)}
-                disabled={!log.full_review}
                 className="w-full h-9 text-xs font-mono uppercase tracking-wider bg-zinc-900 text-zinc-200 border-zinc-800 hover:bg-white hover:text-black rounded-none flex items-center justify-center gap-1.5 mt-2"
               >
                 <Sparkles className="w-3.5 h-3.5" />
-                <span>View Full Review Analysis</span>
+                <span>View Historical State</span>
               </Button>
             </Card>
           ))
@@ -95,7 +94,7 @@ export function AnalyzeHistoryPanel({ logs, onView }: AnalyzeHistoryPanelProps) 
                   <TableHead className="text-zinc-400 font-mono text-xs uppercase tracking-wider py-4">Repository / PR</TableHead>
                   <TableHead className="text-zinc-400 font-mono text-xs uppercase tracking-wider py-4 w-[140px]">Decision</TableHead>
                   <TableHead className="text-zinc-400 font-mono text-xs uppercase tracking-wider py-4 hidden md:table-cell">Reasoning</TableHead>
-                  <TableHead className="text-right text-zinc-400 font-mono text-xs uppercase tracking-wider py-4 w-[90px]">Review</TableHead>
+                  <TableHead className="text-right text-zinc-400 font-mono text-xs uppercase tracking-wider py-4 w-[90px]">History</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -134,10 +133,9 @@ export function AnalyzeHistoryPanel({ logs, onView }: AnalyzeHistoryPanelProps) 
                         variant="ghost"
                         size="sm"
                         onClick={() => onView(log)}
-                        disabled={!log.full_review}
-                        className="h-8 px-3 text-[10px] font-mono uppercase tracking-wider text-zinc-300 hover:text-black hover:bg-white rounded-none transition-all disabled:opacity-30"
+                        className="h-8 px-3 text-[10px] font-mono uppercase tracking-wider text-zinc-300 hover:text-black hover:bg-white rounded-none transition-all"
                       >
-                        View
+                        View State
                       </Button>
                     </TableCell>
                   </TableRow>

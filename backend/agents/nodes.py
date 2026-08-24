@@ -229,6 +229,9 @@ async def record_result(state: PipelineState) -> PipelineState:
         repo_name=state["repo_name"],
         decision_type=decision_type,
         reasoning=state["ai_summary"],
+        risk_score=state["risk_score"],
+        status=state["status"],
+        snapshot_review=full_review,
     )
 
     logger.info(
