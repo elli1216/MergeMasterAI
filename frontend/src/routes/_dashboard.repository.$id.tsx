@@ -2,7 +2,6 @@ import { Link, createFileRoute } from '@tanstack/react-router'
 import { useSuspenseQuery } from '@tanstack/react-query'
 import { convexQuery } from '@convex-dev/react-query'
 import { useAuth } from '@workos-inc/authkit-react'
-import { useMutation } from 'convex/react'
 import { useState } from 'react'
 import { ChevronLeft } from 'lucide-react'
 import { api } from '../../convex/_generated/api'
@@ -25,8 +24,6 @@ function RepositoryDetailPage() {
   const { data } = useSuspenseQuery(convexQuery(api.repositories.getRepositoryDetails, { repositoryId: id as Id<'repositories'> }))
   const { repo, prs, commits, branches } = data
 
-  const overrideDecision = useMutation(api.pullRequests.overrideDecision)
-
   const [reviewTarget, setReviewTarget] = useState<ReviewTarget | null>(null)
   const [review, setReview] = useState<AiReview | null>(null)
   const [reviewing, setReviewing] = useState(false)
@@ -47,12 +44,6 @@ function RepositoryDetailPage() {
         <p>Unauthorized. Please return to the homepage to log in.</p>
       </div>
     )
-  }
-
-  const handleOverride = async (prId: Id<'pull_requests'>, status: 'approved' | 'blocked', reason: string) => {
-    if (reason) {
-      await overrideDecision({ prId, status, reason, userGithubId: user?.id })
-    }
   }
 
   const handleReview = async (pr: any) => {
@@ -89,7 +80,7 @@ function RepositoryDetailPage() {
   }
 
   const handleReanalyze = async () => {
-    if (!reviewTarget) return
+    if (!reviewTarget || review?.status === 'approved') return
     setReview(null)
     setReviewError(null)
     setReviewing(true)
@@ -118,7 +109,7 @@ function RepositoryDetailPage() {
 
         <div className="space-y-12">
           <BranchesPanel branches={branches} />
-          <PullRequestsPanel prs={prs} onOverride={handleOverride} onReview={handleReview} hideRepoLink />
+          <PullRequestsPanel prs={prs} onReview={handleReview} hideRepoLink />
           <CommitsPanel commits={commits} />
         </div>
       </div>

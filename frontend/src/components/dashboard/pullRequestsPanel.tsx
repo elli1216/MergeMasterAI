@@ -1,23 +1,18 @@
-import type { Doc, Id } from '../../../convex/_generated/dataModel'
+import type { Doc } from '../../../convex/_generated/dataModel'
 import { Badge } from '~/components/ui/badge'
 import { Button } from '~/components/ui/button'
 import { Card, CardContent } from '~/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '~/components/ui/table'
 import { Link } from '@tanstack/react-router'
-import { ExternalLink, Sparkles, ShieldCheck, ShieldAlert, Clock, FolderGit2 } from 'lucide-react'
-import { useState } from 'react'
-import { OverrideDialog, type OverrideState } from './overrideDialog'
+import { ExternalLink, Sparkles, Clock, FolderGit2 } from 'lucide-react'
 
 type PullRequestsPanelProps = {
   prs: Array<Doc<'pull_requests'>>
-  onOverride: (prId: Id<'pull_requests'>, status: 'approved' | 'blocked', reason: string) => void
   onReview: (pr: Doc<'pull_requests'>) => void
   hideRepoLink?: boolean
 }
 
-export function PullRequestsPanel({ prs, onOverride, onReview, hideRepoLink }: PullRequestsPanelProps) {
-  const [overrideState, setOverrideState] = useState<OverrideState>(null)
-
+export function PullRequestsPanel({ prs, onReview, hideRepoLink }: PullRequestsPanelProps) {
   return (
     <div className="space-y-4">
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-2">
@@ -28,7 +23,7 @@ export function PullRequestsPanel({ prs, onOverride, onReview, hideRepoLink }: P
               {prs.length} PRs
             </span>
           </h2>
-          <p className="text-zinc-500 font-mono text-xs md:text-sm">Real-time risk scoring, gate statuses & routing</p>
+          <p className="text-zinc-500 font-mono text-xs md:text-sm">Real-time autonomous risk scoring & release gates</p>
         </div>
       </div>
 
@@ -105,37 +100,30 @@ export function PullRequestsPanel({ prs, onOverride, onReview, hideRepoLink }: P
                 </p>
               )}
 
-              {/* Touch-Friendly Action Buttons */}
-              <div className="grid grid-cols-3 gap-2 pt-1 border-t border-zinc-900">
+              {/* Action Buttons */}
+              <div className="flex items-center gap-2 pt-1 border-t border-zinc-900">
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => onReview(pr)}
-                  className="h-10 text-xs font-mono uppercase tracking-wider bg-white text-black font-bold hover:bg-zinc-200 rounded-none border-white flex items-center justify-center gap-1"
+                  className="flex-1 h-10 text-xs font-mono uppercase tracking-wider bg-white text-black font-bold hover:bg-zinc-200 rounded-none border-white flex items-center justify-center gap-1.5"
                 >
                   <Sparkles className="w-3.5 h-3.5" />
-                  <span>AI Review</span>
+                  <span>AI Review & Copilot</span>
                 </Button>
 
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setOverrideState({ prId: pr._id, status: 'approved' })}
-                  className="h-10 text-xs font-mono uppercase tracking-wider bg-zinc-900 text-green-400 border-green-900/60 hover:bg-green-950/40 rounded-none flex items-center justify-center gap-1"
-                >
-                  <ShieldCheck className="w-3.5 h-3.5" />
-                  <span>Approve</span>
-                </Button>
-
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setOverrideState({ prId: pr._id, status: 'blocked' })}
-                  className="h-10 text-xs font-mono uppercase tracking-wider bg-zinc-900 text-red-400 border-red-900/60 hover:bg-red-950/40 rounded-none flex items-center justify-center gap-1"
-                >
-                  <ShieldAlert className="w-3.5 h-3.5" />
-                  <span>Block</span>
-                </Button>
+                {!hideRepoLink && pr.repository_id && (
+                  <Link to="/repository/$id" params={{ id: pr.repository_id }}>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-10 px-3 text-xs font-mono uppercase tracking-wider bg-zinc-900 text-zinc-300 border-zinc-800 hover:bg-zinc-800 rounded-none flex items-center justify-center"
+                      title="View Repository Details"
+                    >
+                      <FolderGit2 className="w-3.5 h-3.5" />
+                    </Button>
+                  </Link>
+                )}
               </div>
             </Card>
           ))
@@ -159,7 +147,7 @@ export function PullRequestsPanel({ prs, onOverride, onReview, hideRepoLink }: P
                   <TableHead className="text-zinc-400 font-mono text-xs uppercase tracking-wider py-4 w-[130px]">Risk Score</TableHead>
                   <TableHead className="text-zinc-400 font-mono text-xs uppercase tracking-wider py-4 w-[110px]">Gate Status</TableHead>
                   <TableHead className="text-zinc-400 font-mono text-xs uppercase tracking-wider py-4 hidden lg:table-cell">AI Analysis</TableHead>
-                  <TableHead className="text-right text-zinc-400 font-mono text-xs uppercase tracking-wider py-4">Actions</TableHead>
+                  <TableHead className="text-right text-zinc-400 font-mono text-xs uppercase tracking-wider py-4 w-[140px]">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -225,7 +213,7 @@ export function PullRequestsPanel({ prs, onOverride, onReview, hideRepoLink }: P
                         {pr.status}
                       </Badge>
                     </TableCell>
-                    <TableCell className="hidden lg:table-cell max-w-[240px] truncate text-xs text-zinc-400 font-serif italic" title={pr.ai_summary}>
+                    <TableCell className="hidden lg:table-cell max-w-[260px] truncate text-xs text-zinc-400 font-serif italic" title={pr.ai_summary}>
                       "{pr.ai_summary}"
                     </TableCell>
                     <TableCell className="text-right space-x-1.5">
@@ -250,24 +238,6 @@ export function PullRequestsPanel({ prs, onOverride, onReview, hideRepoLink }: P
                           </Button>
                         </Link>
                       )}
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setOverrideState({ prId: pr._id, status: 'approved' })}
-                        className="h-8 px-2.5 text-[10px] font-mono uppercase tracking-wider text-green-400 hover:text-black hover:bg-green-400 rounded-none transition-all"
-                        title="Override: Approve PR"
-                      >
-                        Approve
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setOverrideState({ prId: pr._id, status: 'blocked' })}
-                        className="h-8 px-2.5 text-[10px] font-mono uppercase tracking-wider text-red-400 hover:text-white hover:bg-red-900 rounded-none transition-all"
-                        title="Override: Block PR"
-                      >
-                        Block
-                      </Button>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -281,12 +251,6 @@ export function PullRequestsPanel({ prs, onOverride, onReview, hideRepoLink }: P
           )}
         </CardContent>
       </Card>
-
-      <OverrideDialog
-        overrideState={overrideState}
-        onClose={() => setOverrideState(null)}
-        onSubmit={onOverride}
-      />
     </div>
   )
 }

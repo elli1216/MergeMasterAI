@@ -15,8 +15,7 @@ frontend/src/
 │   │   ├── analyzeHistoryPanel.tsx    # Chronological AI decision & override audit log
 │   │   ├── branchesPanel.tsx          # Active Git branches view
 │   │   ├── commitsPanel.tsx           # Recent commits timeline
-│   │   ├── dashboardHeader.tsx        # User identity, RBAC badge, and GitHub Sync trigger
-│   │   ├── overrideDialog.tsx         # Manual merge gate override modal with user attribution
+│   │   ├── dashboardHeader.tsx        # User profile dropdown, RBAC badge, and GitHub Sync trigger
 │   │   ├── policiesPanel.tsx          # No-code organizational coding policies manager
 │   │   ├── pullRequestsPanel.tsx      # Live PR triage table with risk badges and action buttons
 │   │   ├── repositorySidebar.tsx      # Monitored repositories list

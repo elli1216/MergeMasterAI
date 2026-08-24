@@ -162,18 +162,25 @@ export function AiReviewDialog({
                 </DialogDescription>
               </div>
 
-              {/* Re-analyze Action in Header */}
-              {review && !loading && onReanalyze && (
+              {/* Re-analyze Action in Header - Disabled if status is already approved */}
+              {review && !loading && (
                 <div className="flex items-center gap-2 pt-1 sm:pt-0">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={onReanalyze}
-                    className="font-mono text-[10px] sm:text-xs uppercase tracking-wider bg-zinc-950 border-zinc-800 text-zinc-300 hover:text-white hover:bg-zinc-800 rounded-none transition-all flex items-center gap-1.5 h-8 px-3"
-                  >
-                    <RefreshCcw size={11} />
-                    <span>Re-analyze</span>
-                  </Button>
+                  {review.status === 'approved' ? (
+                    <div className="flex items-center gap-1.5 text-[10px] sm:text-xs font-mono text-emerald-400 bg-emerald-950/40 border border-emerald-800/60 px-2.5 py-1 uppercase tracking-wider">
+                      <CheckCircle2 size={12} className="text-emerald-400" />
+                      <span>Approved Gate</span>
+                    </div>
+                  ) : onReanalyze ? (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={onReanalyze}
+                      className="font-mono text-[10px] sm:text-xs uppercase tracking-wider bg-zinc-950 border-zinc-800 text-zinc-300 hover:text-white hover:bg-zinc-800 rounded-none transition-all flex items-center gap-1.5 h-8 px-3"
+                    >
+                      <RefreshCcw size={11} />
+                      <span>Re-analyze</span>
+                    </Button>
+                  ) : null}
                 </div>
               )}
             </div>

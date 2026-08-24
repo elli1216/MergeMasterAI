@@ -34,7 +34,7 @@ export function LandingView({ onSignIn, onSignUp }: LandingViewProps) {
     },
     {
       q: 'Can MergeMaster AI push code directly without human permission?',
-      a: 'The Committer Agent acts as a peer contributor—it pushes fixes to the PR branch where they trigger standard CI/CD checks and are subject to normal human review. Managers can also manually override any automated gate decision directly from the dashboard.',
+      a: 'The Committer Agent acts as a peer contributor—it pushes fixes to the PR branch where they trigger standard CI/CD checks and are subject to normal human review, while the Gatekeeper autonomously sets commit status checks based on risk scoring.',
     },
     {
       q: 'How does the custom organizational policy engine work?',

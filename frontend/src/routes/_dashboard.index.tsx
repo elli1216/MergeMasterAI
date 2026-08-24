@@ -5,7 +5,7 @@ import { convexQuery } from '@convex-dev/react-query'
 import { useAuth } from '@workos-inc/authkit-react'
 import { useEffect, useState } from 'react'
 import { api } from '../../convex/_generated/api'
-import type { Doc, Id } from '../../convex/_generated/dataModel'
+import type { Doc } from '../../convex/_generated/dataModel'
 import type {ReviewTarget} from '~/components/dashboard';
 import type {AiReview} from '~/lib/backend';
 import {
@@ -60,11 +60,9 @@ function IndexPage() {
 }
 
 function Dashboard() {
-  const { user } = useAuth()
   const { data: prs } = useSuspenseQuery(convexQuery(api.pullRequests.getActivePRs, {}))
   const { data: commits } = useSuspenseQuery(convexQuery(api.github.getRecentCommits, {}))
   const { data: historyLogs } = useSuspenseQuery(convexQuery(api.pullRequests.getAnalyzeHistory, {}))
-  const overrideDecision = useMutation(api.pullRequests.overrideDecision)
   const queryClient = useQueryClient()
 
   const [reviewTarget, setReviewTarget] = useState<ReviewTarget | null>(null)
@@ -72,12 +70,6 @@ function Dashboard() {
   const [reviewing, setReviewing] = useState(false)
   const [reviewError, setReviewError] = useState<string | null>(null)
   const [reviewOpen, setReviewOpen] = useState(false)
-
-  const handleOverride = async (prId: Id<'pull_requests'>, status: 'approved' | 'blocked', reason: string) => {
-    if (reason) {
-      await overrideDecision({ prId, status, reason, userGithubId: user?.id })
-    }
-  }
 
   const handleViewHistory = (log: any) => {
     setReviewTarget({ repoName: log.repo_name, prNumber: Number(log.github_pr_id), title: log.pr_title })
@@ -122,7 +114,7 @@ function Dashboard() {
   }
 
   const handleReanalyze = async () => {
-    if (!reviewTarget) return
+    if (!reviewTarget || review?.status === 'approved') return
     setReview(null)
     setReviewError(null)
     setReviewing(true)
@@ -145,7 +137,7 @@ function Dashboard() {
     <>
       <div className="space-y-12">
         <StatsGrid active={activeCount} blocked={blockedCount} approved={approvedCount} commits={commits.length} />
-        <PullRequestsPanel prs={prs} onOverride={handleOverride} onReview={handleReview} />
+        <PullRequestsPanel prs={prs} onReview={handleReview} />
         <CommitsPanel commits={commits} />
         <AnalyzeHistoryPanel logs={historyLogs} onView={handleViewHistory} />
       </div>
