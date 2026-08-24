@@ -109,6 +109,51 @@ _Focus: Reaching full autonomy for bug fixing._
 - Implement logic where, upon finding a critical bug in Phase 4, the Committer Agent drafts a corrected code block. ✅ Graph: `route_reviewers -> [committer_agent if blocked] -> enforce_gate -> record_result`; success flips PR to `pending` and logs a `remediate_code` decision.
 - Use PyGithub to autonomously push the fix as a new commit directly to the PR branch. ✅ `apply_fixes` pushes via `repo.update_file` on the PR head ref (exact unique snippet match required); the follow-up `synchronize` webhook re-runs the pipeline to re-verify.
 
-### Phase 6: Coming next
+### Phase 6: New Features
 
-_Focus: Extending autonomy and operational depth._
+_Focus: Extending autonomy, operational depth, and developer experience._
+
+#### 1. Interactive AI PR Chat (Agentic Q&A)
+
+**The Idea:** Sometimes developers won't understand _why_ the AI blocked a PR or suggested a specific fix. Add an interactive chat interface directly on the PR dashboard (or via GitHub comments).
+**How it works:** A developer can ask, "Can you explain the security risk on line 42?" The AI, having the PR diff in context, answers interactively.
+**Technical Architecture:**
+**Frontend:** Add a chat UI component in the PR details page (`frontend/src/routes/pr/$id.tsx`). Use a Convex mutation to send messages.
+**Backend/Convex:** Create a new Convex table `chat_messages` for persistence. Add a new FastAPI endpoint (`POST /api/chat`) or a LangGraph entrypoint that loads the PR's `risk_score` and `ai_summary` from Convex, along with the diff context, to answer the developer's question using the LLM.
+
+#### 2. Autonomous Unit Test Generation 🧪
+
+**The Idea:** Extend the **Committer Agent** so it doesn't just fix bugs.
+**How it works:** If a PR introduces new business logic but lacks tests, the LangGraph pipeline detects this, drafts the missing unit tests (e.g., PyTest or Jest), and pushes them to the PR branch.
+**Technical Architecture:**
+**Backend:** Update the `backend/agents/graph.py` pipeline to detect missing coverage during `analyze_changes`. Add a conditional edge to route to a new `test_generator_node` (similar to `committer_agent`). Use the `github_client.py` to push the new test files directly to the PR branch via PyGithub.
+
+#### 3. Historical Context & Memory (RAG) 🧠
+
+**The Idea:** Give the AI Analyst memory of past PRs so it learns the repository's specific quirks and recurring issues.
+**How it works:** Embed past merged PRs and bug reports into a vector database (Convex supports vector search). When a new PR is opened, the Analyst queries similar past PRs to warn about recurring bugs.
+**Technical Architecture:**
+**Database:** Expand `frontend/convex/schema.ts` to include a `vector` index on a new `pr_embeddings` table.
+**Backend:** During the `analyze_changes` node in LangGraph, add a step to query Convex for semantically similar PR histories. Inject these past learnings into the system prompt for the IBM/Gemini model before it generates the current PR's risk score.
+
+#### 4. Custom Organizational Policies (No-Code Rules Engine) 🛡️
+
+**The Idea:** Every company has unique coding standards.
+**How it works:** Build a UI in the Dashboard where managers can input natural language rules (e.g., _"Ensure all API endpoints have rate-limiting"_). Store these in Convex, and feed them as dynamic context into the LangGraph Analyst node.
+**Technical Architecture:**
+**Database/Frontend:** Create a `custom_policies` table in Convex and a settings UI in TanStack Start to manage these rules.
+**Backend:** Update `backend/convex_client.py` to fetch active policies. Pass them into the `PipelineState` and append them as strict guidelines in the `analyze_changes` system prompt.
+
+#### 5. Multi-Repo Analytics & ROI Dashboard 📈
+
+**The Idea:** Managers love metrics. Show them how much time MergeMaster AI is saving.
+**How it works:** Build a high-level analytics page in the Dashboard showing total developer hours saved via Auto-Approvals, the most common types of vulnerabilities caught, and reviewer bottlenecks.
+**Technical Architecture:**
+**Frontend:** Add a new route `frontend/src/routes/analytics.tsx`. Use Convex queries to aggregate data from the `ai_decisions_log` and `pull_requests` tables (e.g., count of `auto_approve` decisions, average `risk_score` over time). Render data using a charting library like Recharts.
+
+#### 6. Slack / Microsoft Teams Integration 💬
+
+**The Idea:** Extend the Orchestrator Agent's reach beyond the Dashboard and GitHub.
+**How it works:** When the AI routes a PR to a specific reviewer, it pings them directly in Slack with a summarized brief and risk score.
+**Technical Architecture:**
+**Backend:** Update `backend/agents/nodes.py` (specifically the `route_reviewers` and `record_result` nodes) to parse Slack webhooks from environment variables. Send formatted JSON blocks to the webhook URLs alerting the specified reviewer roles.
