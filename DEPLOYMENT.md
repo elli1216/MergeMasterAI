@@ -27,7 +27,7 @@ This guide details the complete production deployment setup for **MergeMaster AI
 │ • Interactive Copilot   │          │ • POST /api/chat (PR Copilot Q&A)            │
 │ • Test Suite Generator  │          │ • POST /api/generate-tests & /push-tests     │
 │ • Rules & Policies UI   │          │ • POST /api/webhooks/github (Webhook entry)  │
-│ • Analytics ROI Cards   │          │ • LangGraph Pipeline + Gemini LLM / Heuristics│
+│ • Analytics ROI Cards   │          │ • LangGraph Pipeline + IBM Granite / Heuristics│
 └───────────┬─────────────┘          └──────────────────────┬───────────────────────┘
             │                                               │
             │ 2. Real-time Reactive Sync                    │ 3. Mutations & Decision Logs
@@ -88,7 +88,7 @@ This guide details the complete production deployment setup for **MergeMaster AI
    | `GITHUB_WEBHOOK_SECRET` | The Webhook secret string configured in your GitHub App |
    | `CONVEX_URL` | Your Convex deployment URL (e.g. `https://your-app.convex.cloud`) |
    | `CONVEX_ADMIN_KEY` | Convex Deploy Key (e.g. `prod:your-deploy-key`) |
-   | `GEMINI_API_KEY` | Your Google Gemini API Key |
+   | `GEMINI_API_KEY` | Your LLM API Key (IBM watsonx.ai / Granite) |
    | `LLM_API_BASE` | `https://generativelanguage.googleapis.com/v1beta/openai` |
    | `LLM_MODEL` | `gemini-3.5-flash-lite` |
    | `CORS_ORIGINS` | `https://<your-vercel-app>.vercel.app,http://localhost:3000` |

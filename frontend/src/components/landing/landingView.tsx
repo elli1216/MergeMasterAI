@@ -52,7 +52,7 @@ export function LandingView({ onSignIn, onSignUp }: LandingViewProps) {
     },
     {
       q: 'What LLM models and agent frameworks power MergeMaster AI?',
-      a: 'MergeMaster is built on LangGraph (Python) state graphs and uses Google Gemini models for structured JSON reasoning, with a deterministic heuristics fallback engine to ensure offline resilience and prompt-injection safety.',
+      a: 'MergeMaster is built on LangGraph (Python) state graphs and uses IBM Granite models for structured JSON reasoning, with a deterministic heuristics fallback engine to ensure offline resilience and prompt-injection safety.',
     },
   ]
 
@@ -563,7 +563,7 @@ describe('Auth Validation Suite (Synthesized by MergeMaster)', () => {
               </h4>
               <p className="text-zinc-500 text-xs font-mono leading-relaxed">
                 Prunes lockfile noise and retrieves historical security
-                learnings to construct token-optimized prompts for Gemini
+                learnings to construct token-optimized prompts for IBM Granite
                 models.
               </p>
             </div>
@@ -632,7 +632,7 @@ describe('Auth Validation Suite (Synthesized by MergeMaster)', () => {
       </section>
 
       {/* 8. BOTTOM CALL TO ACTION */}
-      <section className="py-20 px-6 border-t border-zinc-900 bg-gradient-to-b from-black to-zinc-950 text-center space-y-6">
+      <section className="py-20 px-6 border-t border-zinc-900 bg-linear-to-b from-black to-zinc-950 text-center space-y-6">
         <h2 className="text-3xl sm:text-5xl font-light text-white tracking-tight">
           Ready to Automate Your Deployment Gates?
         </h2>

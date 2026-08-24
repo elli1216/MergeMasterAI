@@ -283,3 +283,270 @@ export const getRecentCommits = query({
       .take(20)
   },
 })
+
+export const getUserActivityStats = action({
+  args: {
+    token: v.optional(v.string()),
+    username: v.optional(v.string()),
+  },
+  handler: async (_ctx, { token, username }) => {
+    const headers: Record<string, string> = {
+      Accept: 'application/vnd.github+json',
+      'X-GitHub-Api-Version': '2022-11-28',
+      'User-Agent': 'MergeMaster-AI-App',
+    }
+    if (token) {
+      headers.Authorization = `Bearer ${token}`
+    }
+
+    let profile = {
+      login: username || 'User',
+      name: username || 'Developer',
+      avatar_url: 'https://github.com/github.png',
+      bio: '',
+      public_repos: 0,
+      followers: 0,
+      following: 0,
+      html_url: username ? `https://github.com/${username}` : 'https://github.com',
+      company: '',
+      location: '',
+      created_at: '',
+    }
+
+    let eventsRaw: Array<any> = []
+
+    try {
+      // 1. Fetch User Profile
+      const profileEndpoint = token
+        ? 'https://api.github.com/user'
+        : username
+          ? `https://api.github.com/users/${username}`
+          : null
+
+      if (profileEndpoint) {
+        const userRes = await fetch(profileEndpoint, { headers })
+        if (userRes.ok) {
+          const userData = await userRes.json()
+          profile = {
+            login: userData.login || profile.login,
+            name: userData.name || userData.login || profile.name,
+            avatar_url: userData.avatar_url || profile.avatar_url,
+            bio: userData.bio || '',
+            public_repos: userData.public_repos || 0,
+            followers: userData.followers || 0,
+            following: userData.following || 0,
+            html_url: userData.html_url || `https://github.com/${userData.login}`,
+            company: userData.company || '',
+            location: userData.location || '',
+            created_at: userData.created_at || '',
+          }
+        }
+      }
+
+      // 2. Fetch User Events
+      const targetUser = profile.login || username
+      if (targetUser && targetUser !== 'User') {
+        const eventsUrl = token
+          ? 'https://api.github.com/user/events?per_page=100'
+          : `https://api.github.com/users/${targetUser}/events?per_page=100`
+
+        const eventsRes = await fetch(eventsUrl, { headers })
+        if (eventsRes.ok) {
+          eventsRaw = await eventsRes.json()
+        }
+      }
+    } catch (err) {
+      console.warn('GitHub API fetch error during activity stats:', err)
+    }
+
+    // 3. Process Events & Metrics
+    let totalCommits = 0
+    let pushCount = 0
+    let prCount = 0
+    let issueCount = 0
+    let reviewCount = 0
+    let createCount = 0
+
+    const repoActivityMap: Record<string, { name: string; events: number; commits: number }> = {}
+    const dateCountMap: Record<string, number> = {}
+    const activityFeed: Array<{
+      id: string
+      type: 'push' | 'pull_request' | 'review' | 'issue' | 'create' | 'other'
+      repo: string
+      timestamp: string
+      summary: string
+      details?: Array<string>
+      url?: string
+    }> = []
+
+    for (const ev of eventsRaw) {
+      const repoName = ev.repo?.name || 'unknown'
+      if (!repoActivityMap[repoName]) {
+        repoActivityMap[repoName] = { name: repoName, events: 0, commits: 0 }
+      }
+      repoActivityMap[repoName].events++
+
+      const dateStr = ev.created_at ? ev.created_at.split('T')[0] : ''
+      if (dateStr) {
+        dateCountMap[dateStr] = (dateCountMap[dateStr] || 0) + 1
+      }
+
+      const eventType = ev.type
+      if (eventType === 'PushEvent') {
+        pushCount++
+        const commits = ev.payload?.commits || []
+        const commitCount = commits.length || 1
+        totalCommits += commitCount
+        repoActivityMap[repoName].commits += commitCount
+
+        const commitMsgs = commits.slice(0, 3).map((c: any) => c.message?.split('\n')[0] || c.sha?.slice(0, 7))
+        activityFeed.push({
+          id: ev.id,
+          type: 'push',
+          repo: repoName,
+          timestamp: ev.created_at,
+          summary: `Pushed ${commitCount} commit${commitCount > 1 ? 's' : ''} to ${ev.payload?.ref?.replace('refs/heads/', '') || 'branch'}`,
+          details: commitMsgs,
+          url: `https://github.com/${repoName}/commit/${commits[0]?.sha || ''}`,
+        })
+      } else if (eventType === 'PullRequestEvent') {
+        prCount++
+        const action = ev.payload?.action || 'opened'
+        const pr = ev.payload?.pull_request || {}
+        activityFeed.push({
+          id: ev.id,
+          type: 'pull_request',
+          repo: repoName,
+          timestamp: ev.created_at,
+          summary: `${action.charAt(0).toUpperCase() + action.slice(1)} Pull Request #${pr.number || ''}: ${pr.title || ''}`,
+          url: pr.html_url || `https://github.com/${repoName}/pulls`,
+        })
+      } else if (eventType === 'PullRequestReviewEvent' || eventType === 'PullRequestReviewCommentEvent') {
+        reviewCount++
+        const pr = ev.payload?.pull_request || {}
+        activityFeed.push({
+          id: ev.id,
+          type: 'review',
+          repo: repoName,
+          timestamp: ev.created_at,
+          summary: `Reviewed Pull Request #${pr.number || ''} on ${repoName}`,
+          url: pr.html_url || `https://github.com/${repoName}/pulls`,
+        })
+      } else if (eventType === 'IssuesEvent' || eventType === 'IssueCommentEvent') {
+        issueCount++
+        const issue = ev.payload?.issue || {}
+        activityFeed.push({
+          id: ev.id,
+          type: 'issue',
+          repo: repoName,
+          timestamp: ev.created_at,
+          summary: `Issue activity on #${issue.number || ''}: ${issue.title || ''}`,
+          url: issue.html_url || `https://github.com/${repoName}/issues`,
+        })
+      } else if (eventType === 'CreateEvent') {
+        createCount++
+        const refType = ev.payload?.ref_type || 'repository'
+        const refName = ev.payload?.ref || repoName
+        activityFeed.push({
+          id: ev.id,
+          type: 'create',
+          repo: repoName,
+          timestamp: ev.created_at,
+          summary: `Created ${refType} "${refName}"`,
+          url: `https://github.com/${repoName}`,
+        })
+      } else {
+        activityFeed.push({
+          id: ev.id,
+          type: 'other',
+          repo: repoName,
+          timestamp: ev.created_at,
+          summary: `${ev.type.replace('Event', '')} activity on ${repoName}`,
+          url: `https://github.com/${repoName}`,
+        })
+      }
+    }
+
+    // 4. Calculate Streaks & 30-Day Heatmap
+    const today = new Date()
+    const heatmap: Array<{ date: string; count: number; level: number; dayOfWeek: number }> = []
+
+    for (let i = 29; i >= 0; i--) {
+      const d = new Date(today)
+      d.setDate(d.getDate() - i)
+      const ds = d.toISOString().split('T')[0]
+      const count = dateCountMap[ds] || 0
+      let level = 0
+      if (count > 0) level = 1
+      if (count >= 3) level = 2
+      if (count >= 6) level = 3
+      if (count >= 10) level = 4
+      heatmap.push({
+        date: ds,
+        count,
+        level,
+        dayOfWeek: d.getDay(),
+      })
+    }
+
+    // Calculate current streak
+    let currentStreak = 0
+    let checkDate = new Date(today)
+    while (true) {
+      const ds = checkDate.toISOString().split('T')[0]
+      if (dateCountMap[ds] && dateCountMap[ds] > 0) {
+        currentStreak++
+        checkDate.setDate(checkDate.getDate() - 1)
+      } else {
+        // If today has 0, check if yesterday had activity
+        if (currentStreak === 0) {
+          checkDate.setDate(checkDate.getDate() - 1)
+          const yestDs = checkDate.toISOString().split('T')[0]
+          if (dateCountMap[yestDs] && dateCountMap[yestDs] > 0) {
+            currentStreak = 1
+            checkDate.setDate(checkDate.getDate() - 1)
+            continue
+          }
+        }
+        break
+      }
+    }
+
+    // Calculate longest streak in the 30-day window
+    let longestStreak = 0
+    let tempStreak = 0
+    for (const cell of heatmap) {
+      if (cell.count > 0) {
+        tempStreak++
+        if (tempStreak > longestStreak) longestStreak = tempStreak
+      } else {
+        tempStreak = 0
+      }
+    }
+    if (currentStreak > longestStreak) longestStreak = currentStreak
+
+    // Top repositories
+    const topRepositories = Object.values(repoActivityMap)
+      .sort((a, b) => b.events - a.events)
+      .slice(0, 5)
+
+    return {
+      profile,
+      metrics: {
+        totalEvents: eventsRaw.length,
+        totalCommits,
+        pushCount,
+        prCount,
+        reviewCount,
+        issueCount,
+        createCount,
+        currentStreak,
+        longestStreak,
+        activeDaysCount: Object.keys(dateCountMap).length,
+      },
+      heatmap,
+      topRepositories,
+      recentActivity: activityFeed.slice(0, 25),
+    }
+  },
+})

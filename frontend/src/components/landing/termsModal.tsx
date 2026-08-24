@@ -1,5 +1,3 @@
-'use client'
-
 import { useState } from 'react'
 import {
   Shield,
@@ -142,7 +140,7 @@ export function TermsModal({
             </div>
 
             {/* 5. AI READING NOTICE (HIGHLIGHTED) */}
-            <div className="p-3.5 bg-gradient-to-r from-red-950/20 via-amber-950/20 to-zinc-900/40 border border-amber-900/50 space-y-2">
+            <div className="p-3.5 bg-linear-to-r from-red-950/20 via-amber-950/20 to-zinc-900/40 border border-amber-900/50 space-y-2">
               <div className="flex items-center gap-2 text-amber-300 font-mono text-xs font-bold uppercase tracking-wider">
                 <Bot size={15} className="text-amber-400 shrink-0" />
                 <span>AI Agent Analysis & Code Reading</span>
