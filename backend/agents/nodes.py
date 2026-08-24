@@ -146,11 +146,16 @@ async def committer_agent(state: PipelineState) -> PipelineState:
         note += "no safe automatic remediation drafted"
         return {**state, "remediation_note": note}
     new_sha, applied = await asyncio.to_thread(
-        apply_fixes, state["repo_name"], state["head_ref"], state["head_sha"], fixes
+        apply_fixes,
+        state["repo_name"],
+        state["head_ref"],
+        state["head_sha"],
+        fixes,
+        state.get("github_token"),
     )
     if not applied:
         note = f"{note}; " if note else ""
-        note += "fixes drafted but could not be pushed (no GitHub App access)"
+        note += "fixes drafted but could not be pushed (no GitHub token or App write access)"
         return {**state, "remediation_note": note}
     ai_summary = f"{state['ai_summary']} Remediation commit {new_sha[:7]} pushed by Committer Agent."
     return {
@@ -174,6 +179,8 @@ async def enforce_gate(state: PipelineState) -> PipelineState:
         status=state["status"],
         risk_score=state["risk_score"],
         summary=state["ai_summary"],
+        github_token=state.get("github_token"),
+        findings=state.get("findings", []),
     )
     return state
 

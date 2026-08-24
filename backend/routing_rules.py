@@ -24,16 +24,20 @@ DEFAULT_ROUTING_RULES = [
 
 ROUTING_RULES = DEFAULT_ROUTING_RULES
 
-DOC_EXTENSIONS = (".md", ".txt", ".rst")
+DOC_EXTENSIONS = (".md", ".txt", ".rst", ".mdx", ".adoc")
 
 
 def is_docs_file(filename: str) -> bool:
+    if not filename:
+        return False
     name = filename.lower()
     if name.endswith(DOC_EXTENSIONS):
         return True
     if name.startswith("docs/") or "/docs/" in name:
         return True
-    return any(token in name for token in ("readme", "changelog", "contributing"))
+    if name.endswith((".env.example", ".env.sample", ".env.template", ".example")):
+        return True
+    return any(token in name for token in ("readme", "changelog", "contributing", "license", "setup.md", "phases.md", "agents.md"))
 
 
 def route_files(

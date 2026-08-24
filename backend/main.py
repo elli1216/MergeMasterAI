@@ -288,6 +288,8 @@ async def chat_about_pr(request: Request):
     system_prompt = (
         "You are MergeMaster AI's Interactive PR Copilot (IBM AI Builders Challenge).\n"
         "You help software engineers and managers understand pull request risks, findings, and remediation.\n"
+        "Format your answer cleanly in Markdown (use bullet points, bold text, and syntax-highlighted code blocks where appropriate).\n"
+        "Do NOT return JSON. Return natural, human-readable Markdown.\n"
         "Be concise, technical, direct, and reference code specifics when answering.\n"
         f"Pull Request: {repo_name} #{pr_number}\n\n"
         f"Diff Context:\n{diff_str[:30000]}"
@@ -306,6 +308,7 @@ async def chat_about_pr(request: Request):
             system=system_prompt,
             user=question,
             temperature=0.3,
+            json_mode=False,
         )
         return {"answer": answer}
     except Exception as exc:

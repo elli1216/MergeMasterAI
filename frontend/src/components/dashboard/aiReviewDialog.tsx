@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import {
   AlertCircle,
   AlertTriangle,
@@ -16,18 +16,16 @@ import {
   Bot,
   User,
   Sparkles,
+  Copy,
+  Check,
+  Filter,
 } from 'lucide-react'
 import type { AiReview, GeneratedTestSuite } from '~/lib/backend'
 import { askPrCopilot, generatePrTests, pushPrTests } from '~/lib/backend'
 import { Badge } from '~/components/ui/badge'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from '~/components/ui/dialog'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '~/components/ui/dialog'
 import { Button } from '~/components/ui/button'
+import ReactMarkdown from 'react-markdown'
 
 const SEVERITY_STYLES: Record<string, { badge: string; icon: any; color: string }> = {
   critical: { badge: 'border-red-900 bg-red-950/50 text-red-400', icon: ShieldAlert, color: 'text-red-500' },
@@ -49,6 +47,29 @@ function getRiskColor(score: number | null | undefined) {
   if (score <= 25) return 'text-emerald-400'
   if (score <= 75) return 'text-amber-400'
   return 'text-red-400'
+}
+
+function formatCopilotMessage(raw: string): string {
+  if (!raw) return ''
+  const trimmed = raw.trim()
+  if ((trimmed.startsWith('{') && trimmed.endsWith('}')) || (trimmed.startsWith('```json') && trimmed.endsWith('```'))) {
+    try {
+      const cleanJson = trimmed.replace(/^```json\s*/i, '').replace(/\s*```$/, '').trim()
+      const parsed = JSON.parse(cleanJson)
+      if (typeof parsed === 'string') return parsed
+      if (parsed.answer && typeof parsed.answer === 'string') return parsed.answer
+      if (parsed.response && typeof parsed.response === 'string') return parsed.response
+      if (parsed.message && typeof parsed.message === 'string') return parsed.message
+      if (parsed.explanation && typeof parsed.explanation === 'string') return parsed.explanation
+      if (parsed.content && typeof parsed.content === 'string') return parsed.content
+      return Object.entries(parsed)
+        .map(([k, v]) => `**${k}**: ${typeof v === 'object' ? JSON.stringify(v, null, 2) : String(v)}`)
+        .join('\n\n')
+    } catch {
+      // Not valid JSON, keep as raw string
+    }
+  }
+  return raw
 }
 
 export type ReviewTarget = { repoName: string; prNumber: number; title: string }
@@ -84,6 +105,11 @@ export function AiReviewDialog({
   const [messages, setMessages] = useState<Array<ChatMessage>>([])
   const [chatInput, setChatInput] = useState('')
   const [chatLoading, setChatLoading] = useState(false)
+  const [copiedMsgIndex, setCopiedMsgIndex] = useState<number | null>(null)
+  const messagesEndRef = useRef<HTMLDivElement | null>(null)
+
+  // Findings Filter State
+  const [severityFilter, setSeverityFilter] = useState<'all' | 'critical' | 'high' | 'medium' | 'low'>('all')
 
   // Test Generator State
   const [testSuite, setTestSuite] = useState<GeneratedTestSuite | null>(null)
@@ -91,6 +117,32 @@ export function AiReviewDialog({
   const [testError, setTestError] = useState<string | null>(null)
   const [pushingTests, setPushingTests] = useState(false)
   const [pushResult, setPushResult] = useState<string | null>(null)
+  const [copiedTestCode, setCopiedTestCode] = useState(false)
+
+  // Auto-scroll chat to bottom on new messages
+  useEffect(() => {
+    if (activeTab === 'chat') {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    }
+  }, [messages, chatLoading, activeTab])
+
+  // Copy helper
+  const handleCopyText = (text: string, index?: number) => {
+    navigator.clipboard.writeText(text)
+    if (index !== undefined) {
+      setCopiedMsgIndex(index)
+      setTimeout(() => setCopiedMsgIndex(null), 2000)
+    } else {
+      setCopiedTestCode(true)
+      setTimeout(() => setCopiedTestCode(false), 2000)
+    }
+  }
+
+  // Filtered findings list
+  const filteredFindings = review?.findings.filter((f) => {
+    if (severityFilter === 'all') return true
+    return f.severity.toLowerCase() === severityFilter
+  }) ?? []
 
   // Send a chat message to PR Copilot
   const handleSendMessage = async (customPrompt?: string) => {
@@ -341,15 +393,45 @@ export function AiReviewDialog({
                       </div>
                     )}
 
-                    {/* Findings Section - Responsive 2-column on large displays */}
+                    {/* Findings Section - with Interactive Severity Filtering */}
                     <div className="space-y-4 pt-4 border-t border-zinc-900">
-                      <div className="flex items-center justify-between">
-                        <p className="font-mono text-xs uppercase tracking-widest text-zinc-400">
-                          Detailed Findings & Violations
-                        </p>
-                        <Badge variant="outline" className="bg-zinc-900 text-zinc-400 border-zinc-800 font-mono text-[10px]">
-                          {review.findings.length} Flagged
-                        </Badge>
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                        <div>
+                          <p className="font-mono text-xs uppercase tracking-widest text-zinc-400">
+                            Detailed Findings & Violations
+                          </p>
+                          <p className="text-[11px] text-zinc-600 font-mono">
+                            Showing {filteredFindings.length} of {review.findings.length} findings
+                          </p>
+                        </div>
+
+                        {/* Severity Filter Pills */}
+                        {review.findings.length > 0 && (
+                          <div className="flex items-center gap-1 bg-black/50 p-1 border border-zinc-900 overflow-x-auto">
+                            <span className="text-[10px] font-mono text-zinc-600 px-1 flex items-center gap-1">
+                              <Filter size={10} />
+                            </span>
+                            {(['all', 'critical', 'high', 'medium', 'low'] as const).map((sev) => {
+                              const count = sev === 'all'
+                                ? review.findings.length
+                                : review.findings.filter((f) => f.severity.toLowerCase() === sev).length
+                              if (sev !== 'all' && count === 0) return null
+                              return (
+                                <button
+                                  key={sev}
+                                  onClick={() => setSeverityFilter(sev)}
+                                  className={`px-2 py-0.5 font-mono text-[10px] uppercase transition-colors rounded-none ${
+                                    severityFilter === sev
+                                      ? 'bg-zinc-200 text-black font-bold'
+                                      : 'text-zinc-400 hover:text-white bg-zinc-900/60'
+                                  }`}
+                                >
+                                  {sev} {count > 0 && `(${count})`}
+                                </button>
+                              )
+                            })}
+                          </div>
+                        )}
                       </div>
 
                       {review.findings.length === 0 ? (
@@ -357,9 +439,13 @@ export function AiReviewDialog({
                           <CheckCircle2 className="mx-auto h-8 w-8 text-emerald-400/60 mb-2" />
                           <p className="font-mono text-xs text-zinc-400">Clean code! Zero vulnerabilities or blockers detected.</p>
                         </div>
+                      ) : filteredFindings.length === 0 ? (
+                        <div className="text-center py-8 border border-zinc-900 bg-zinc-950/30">
+                          <p className="font-mono text-xs text-zinc-500">No findings with severity "{severityFilter}".</p>
+                        </div>
                       ) : (
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-                          {review.findings.map((finding, i) => {
+                          {filteredFindings.map((finding, i) => {
                             const style = SEVERITY_STYLES[finding.severity.toLowerCase()] || SEVERITY_STYLES.low
                             const Icon = style.icon
                             return (
@@ -411,7 +497,9 @@ export function AiReviewDialog({
               <div className="flex-1 overflow-y-auto space-y-3 p-4 bg-black/40 border border-zinc-800 rounded-none">
                 {messages.length === 0 ? (
                   <div className="h-full flex flex-col items-center justify-center text-center p-4 text-zinc-600 space-y-4">
-                    <Bot className="w-10 h-10 text-zinc-500" />
+                    <div className="w-12 h-12 rounded-full bg-zinc-900 border border-zinc-800 flex items-center justify-center">
+                      <Bot className="w-6 h-6 text-zinc-400" />
+                    </div>
                     <div>
                       <p className="font-mono text-xs uppercase tracking-widest text-zinc-300">
                         Interactive PR Copilot
@@ -456,20 +544,47 @@ export function AiReviewDialog({
                         </div>
                       )}
                       <div
-                        className={`p-3.5 max-w-[85%] sm:max-w-[75%] md:max-w-[70%] rounded-none ${
+                        className={`group relative p-3.5 max-w-[88%] sm:max-w-[80%] md:max-w-[75%] rounded-none ${
                           msg.sender === 'user'
                             ? 'bg-white text-black font-sans font-medium'
                             : 'bg-zinc-900 border border-zinc-800 text-zinc-200 font-sans'
                         }`}
                       >
-                        <p className="whitespace-pre-wrap">{msg.text}</p>
-                        <span
-                          className={`text-[9px] font-mono block mt-1.5 ${
-                            msg.sender === 'user' ? 'text-zinc-600 text-right' : 'text-zinc-500'
-                          }`}
-                        >
-                          {msg.time}
-                        </span>
+                        {msg.sender === 'ai' ? (
+                          <div className="prose prose-invert max-w-none text-xs sm:text-sm leading-relaxed text-zinc-200 space-y-2 [&_pre]:bg-black [&_pre]:p-3 [&_pre]:border [&_pre]:border-zinc-800 [&_pre]:overflow-x-auto [&_pre]:my-2 [&_code]:font-mono [&_code]:text-xs [&_code]:text-blue-300 [&_code]:bg-zinc-950/80 [&_code]:px-1 [&_code]:py-0.5 [&_ul]:list-disc [&_ul]:pl-4 [&_ul]:my-2 [&_ol]:list-decimal [&_ol]:pl-4 [&_ol]:my-2 [&_strong]:text-white [&_strong]:font-semibold [&_a]:text-blue-400 [&_p]:mb-2 [&_p:last-child]:mb-0 [&_h1]:text-sm [&_h1]:font-bold [&_h1]:text-white [&_h2]:text-xs [&_h2]:font-bold [&_h2]:text-white [&_h3]:text-xs [&_h3]:font-semibold [&_h3]:text-zinc-300">
+                            <ReactMarkdown>{formatCopilotMessage(msg.text)}</ReactMarkdown>
+                          </div>
+                        ) : (
+                          <p className="whitespace-pre-wrap text-xs sm:text-sm">{msg.text}</p>
+                        )}
+                        <div className="flex items-center justify-between gap-4 mt-2">
+                          <span
+                            className={`text-[9px] font-mono block ${
+                              msg.sender === 'user' ? 'text-zinc-600' : 'text-zinc-500'
+                            }`}
+                          >
+                            {msg.time}
+                          </span>
+                          {msg.sender === 'ai' && (
+                            <button
+                              onClick={() => handleCopyText(msg.text, i)}
+                              className="text-[10px] text-zinc-500 hover:text-zinc-300 flex items-center gap-1 opacity-80 hover:opacity-100 transition-opacity"
+                              title="Copy message"
+                            >
+                              {copiedMsgIndex === i ? (
+                                <>
+                                  <Check size={10} className="text-emerald-400" />
+                                  <span className="text-emerald-400 text-[9px] font-mono">Copied</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Copy size={10} />
+                                  <span className="text-[9px] font-mono">Copy</span>
+                                </>
+                              )}
+                            </button>
+                          )}
+                        </div>
                       </div>
                       {msg.sender === 'user' && (
                         <div className="w-7 h-7 rounded-none bg-zinc-900 border border-zinc-800 flex items-center justify-center shrink-0 mt-0.5">
@@ -480,11 +595,19 @@ export function AiReviewDialog({
                   ))
                 )}
                 {chatLoading && (
-                  <div className="flex gap-2 items-center text-xs font-mono text-zinc-400 animate-pulse p-2">
-                    <Bot className="w-4 h-4 text-blue-400" />
-                    <span>MergeMaster Copilot is thinking...</span>
+                  <div className="flex gap-3 items-center text-xs font-mono text-zinc-400 p-2">
+                    <div className="w-7 h-7 rounded-none bg-zinc-900 border border-zinc-800 flex items-center justify-center shrink-0">
+                      <Bot className="w-4 h-4 text-blue-400 animate-pulse" />
+                    </div>
+                    <div className="flex items-center gap-1.5 bg-zinc-900/60 border border-zinc-800 px-3 py-2">
+                      <span className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-bounce [animation-delay:-0.3s]" />
+                      <span className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-bounce [animation-delay:-0.15s]" />
+                      <span className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-bounce" />
+                      <span className="text-zinc-500 text-[11px] ml-1.5">Copilot analyzing...</span>
+                    </div>
                   </div>
                 )}
+                <div ref={messagesEndRef} />
               </div>
 
               {/* Chat Input */}
@@ -497,7 +620,7 @@ export function AiReviewDialog({
               >
                 <input
                   type="text"
-                  placeholder="Ask a question about this PR..."
+                  placeholder="Ask a question about this PR... (e.g. 'Explain line 42 in auth.ts')"
                   value={chatInput}
                   onChange={(e) => setChatInput(e.target.value)}
                   disabled={chatLoading}
@@ -566,15 +689,35 @@ export function AiReviewDialog({
                       </Badge>
                       <code className="text-xs font-mono text-zinc-400 truncate">{testSuite.test_file_path}</code>
                     </div>
-                    <Button
-                      onClick={handlePushTests}
-                      disabled={pushingTests}
-                      size="sm"
-                      className="bg-emerald-400 text-black hover:bg-emerald-300 rounded-none font-mono text-xs uppercase tracking-wider font-bold flex items-center justify-center gap-1.5 h-8 px-3"
-                    >
-                      <GitCommit size={13} />
-                      {pushingTests ? 'Pushing Commit...' : 'Push to PR Branch'}
-                    </Button>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        onClick={() => handleCopyText(testSuite.test_code)}
+                        variant="outline"
+                        size="sm"
+                        className="bg-zinc-950 border-zinc-800 text-zinc-300 hover:text-white rounded-none font-mono text-xs uppercase h-8 px-3"
+                      >
+                        {copiedTestCode ? (
+                          <>
+                            <Check size={12} className="text-emerald-400 mr-1" />
+                            <span className="text-emerald-400">Copied</span>
+                          </>
+                        ) : (
+                          <>
+                            <Copy size={12} className="mr-1" />
+                            <span>Copy Code</span>
+                          </>
+                        )}
+                      </Button>
+                      <Button
+                        onClick={handlePushTests}
+                        disabled={pushingTests}
+                        size="sm"
+                        className="bg-emerald-400 text-black hover:bg-emerald-300 rounded-none font-mono text-xs uppercase tracking-wider font-bold flex items-center justify-center gap-1.5 h-8 px-3"
+                      >
+                        <GitCommit size={13} />
+                        {pushingTests ? 'Pushing Commit...' : 'Push to PR Branch'}
+                      </Button>
+                    </div>
                   </div>
 
                   {testSuite.explanation && (

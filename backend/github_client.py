@@ -117,12 +117,14 @@ def enforce_gate(
     status: str,
     risk_score: int,
     summary: str,
+    github_token: str | None = None,
+    findings: list | None = None,
 ) -> None:
-    """Set the GitHub commit status gate and log a Blocker ticket on critical flaws."""
+    """Set the GitHub commit status gate and consolidate blocker issues on GitHub."""
     owner, repo = repo_name.split("/", 1)
-    token = get_installation_token(owner)
+    token = github_token or get_installation_token(owner) or getattr(config, "GITHUB_TOKEN", None)
     if not token:
-        logger.info("no GitHub App access; skipping commit-status gate enforcement")
+        logger.info("no GitHub token or GitHub App access; skipping commit-status gate enforcement")
         return
     gh = Github(token)
     gh_repo = gh.get_repo(repo_name)
@@ -145,25 +147,67 @@ def enforce_gate(
     except Exception as exc:
         logger.warning("failed to set commit status: %s", exc)
 
+    issue_prefix = f"[MergeMaster] Blocker on PR #{pr_number}"
+
     if status == "blocked":
         try:
-            title = f"[MergeMaster] Blocker on PR #{pr_number} (risk {risk_score}/100)"
-            # De-duplicate: repeated webhooks/retries must not spam the repo.
-            existing = any(
-                i.title == title
-                for i in itertools.islice(gh_repo.get_issues(state="open"), 0, 300)
-            )
-            if existing:
-                logger.info("Blocker ticket already exists for PR #%s; skipping", pr_number)
-            else:
-                gh_repo.create_issue(
-                    title=title,
-                    body=(
-                        f"MergeMaster AI blocked PR #{pr_number}.\n\n"
-                        f"**Reason:** {summary}\n\n"
-                        f"**Risk score:** {risk_score}/100"
-                    ),
+            # Build 1 single consolidated issue body containing all issues/findings
+            findings_list = findings or []
+            findings_table = ""
+            if findings_list:
+                rows = []
+                for f in findings_list:
+                    f_dict = f.model_dump() if hasattr(f, "model_dump") else (f if isinstance(f, dict) else {})
+                    severity = str(f_dict.get("severity", "high")).upper()
+                    category = str(f_dict.get("category", "security"))
+                    file_path = str(f_dict.get("file", ""))
+                    detail = str(f_dict.get("detail", ""))
+                    icon = "🔴" if severity == "CRITICAL" else ("🟡" if severity == "HIGH" else "⚪")
+                    rows.append(f"| {icon} **{severity}** | {category} | `{file_path}` | {detail} |")
+                findings_table = (
+                    "### ⚠️ Combined Findings & Vulnerabilities\n"
+                    "| Severity | Category | Target File | Issue Description |\n"
+                    "| :--- | :--- | :--- | :--- |\n" + "\n".join(rows) + "\n\n"
                 )
-                logger.info("Blocker ticket created for PR #%s", pr_number)
+
+            body = (
+                f"## 🛑 MergeMaster AI Release Gate: PR #{pr_number} Blocked\n\n"
+                f"**Risk Score:** `{risk_score}/100`  \n"
+                f"**AI Decision Summary:** {summary}\n\n"
+                f"{findings_table}"
+                f"---\n"
+                f"*This single consolidated blocker issue is automatically managed by MergeMaster AI.*"
+            )
+
+            title = f"[MergeMaster] Blocker on PR #{pr_number}"
+
+            # Check for ANY existing open blocker issue on this PR to prevent redundant issues
+            existing_issue = None
+            for i in itertools.islice(gh_repo.get_issues(state="open"), 0, 100):
+                if i.title.startswith(issue_prefix):
+                    existing_issue = i
+                    break
+
+            if existing_issue:
+                # Update existing issue with latest consolidated findings rather than opening duplicate
+                existing_issue.edit(title=title, body=body)
+                logger.info("Updated existing consolidated Blocker issue #%s for PR #%s", existing_issue.number, pr_number)
+            else:
+                new_issue = gh_repo.create_issue(title=title, body=body)
+                logger.info("Created single consolidated Blocker issue #%s for PR #%s", new_issue.number, pr_number)
         except Exception as exc:
-            logger.warning("failed to create Blocker ticket: %s", exc)
+            logger.warning("failed to manage Blocker ticket: %s", exc)
+
+    elif status in ("approved", "merged"):
+        try:
+            # Automatically close open blocker issue if one exists
+            for i in itertools.islice(gh_repo.get_issues(state="open"), 0, 50):
+                if i.title.startswith(issue_prefix):
+                    i.create_comment(
+                        f"✅ **MergeMaster Gate Passed**: PR #{pr_number} reached status `{status}` (risk {risk_score}/100).\n"
+                        f"Closing this blocker issue automatically."
+                    )
+                    i.edit(state="closed")
+                    logger.info("Closed resolved Blocker issue #%s for PR #%s", i.number, pr_number)
+        except Exception as exc:
+            logger.warning("failed to close resolved Blocker ticket: %s", exc)
