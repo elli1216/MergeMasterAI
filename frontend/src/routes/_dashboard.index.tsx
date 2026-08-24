@@ -6,8 +6,11 @@ import { useAuth } from '@workos-inc/authkit-react'
 import { useEffect, useState } from 'react'
 import { api } from '../../convex/_generated/api'
 import type { Doc } from '../../convex/_generated/dataModel'
-import type { ReviewTarget, AnalysisHistoryRecord } from '~/components/dashboard';
-import type { AiReview } from '~/lib/backend';
+import type {
+  ReviewTarget,
+  AnalysisHistoryRecord,
+} from '~/components/dashboard'
+import type { AiReview } from '~/lib/backend'
 import {
   AiReviewDialog,
   AnalysisHistoryDialog,
@@ -18,7 +21,7 @@ import {
 } from '~/components/dashboard'
 import { requestAiReview } from '~/lib/backend'
 import { LandingView } from '~/components/landing/landingView'
-
+import Loading from '~/components/common/Loading'
 
 export const Route = createFileRoute('/_dashboard/')({
   component: IndexPage,
@@ -36,7 +39,9 @@ function IndexPage() {
       // 2. Sync new signups to the Convex database
       syncUser({
         github_id: user.id,
-        name: user.firstName ? `${user.firstName} ${user.lastName || ''}`.trim() : 'Anonymous Engineer',
+        name: user.firstName
+          ? `${user.firstName} ${user.lastName || ''}`.trim()
+          : 'Anonymous Engineer',
         email: user.email,
       }).catch(console.error)
     } else if (!isLoading) {
@@ -46,11 +51,7 @@ function IndexPage() {
   }, [user, isLoading, syncUser])
 
   if (isLoading) {
-    return (
-      <div className="min-h-screen bg-black flex items-center justify-center">
-        <div className="text-white font-mono uppercase tracking-widest text-xs animate-pulse">Loading System...</div>
-      </div>
-    )
+    return <Loading />
   }
 
   if (!user) {
@@ -61,9 +62,15 @@ function IndexPage() {
 }
 
 function Dashboard() {
-  const { data: prs } = useSuspenseQuery(convexQuery(api.pullRequests.getActivePRs, {}))
-  const { data: commits } = useSuspenseQuery(convexQuery(api.github.getRecentCommits, {}))
-  const { data: historyLogs } = useSuspenseQuery(convexQuery(api.pullRequests.getAnalyzeHistory, {}))
+  const { data: prs } = useSuspenseQuery(
+    convexQuery(api.pullRequests.getActivePRs, {}),
+  )
+  const { data: commits } = useSuspenseQuery(
+    convexQuery(api.github.getRecentCommits, {}),
+  )
+  const { data: historyLogs } = useSuspenseQuery(
+    convexQuery(api.pullRequests.getAnalyzeHistory, {}),
+  )
   const queryClient = useQueryClient()
 
   // Live PR Review Dialog State
@@ -74,7 +81,8 @@ function Dashboard() {
   const [reviewOpen, setReviewOpen] = useState(false)
 
   // Dedicated Historical Analysis State Modal
-  const [selectedHistoryRecord, setSelectedHistoryRecord] = useState<AnalysisHistoryRecord | null>(null)
+  const [selectedHistoryRecord, setSelectedHistoryRecord] =
+    useState<AnalysisHistoryRecord | null>(null)
   const [historyDialogOpen, setHistoryDialogOpen] = useState(false)
 
   const handleViewHistory = (log: any) => {
@@ -122,7 +130,10 @@ function Dashboard() {
     setReviewError(null)
     setReviewing(true)
     try {
-      const result = await requestAiReview(reviewTarget.repoName, reviewTarget.prNumber)
+      const result = await requestAiReview(
+        reviewTarget.repoName,
+        reviewTarget.prNumber,
+      )
       setReview(result)
       await queryClient.invalidateQueries()
     } catch (err) {
@@ -139,7 +150,12 @@ function Dashboard() {
   return (
     <>
       <div className="space-y-12">
-        <StatsGrid active={activeCount} blocked={blockedCount} approved={approvedCount} commits={commits.length} />
+        <StatsGrid
+          active={activeCount}
+          blocked={blockedCount}
+          approved={approvedCount}
+          commits={commits.length}
+        />
         <PullRequestsPanel prs={prs} onReview={handleReview} />
         <CommitsPanel commits={commits} />
         <AnalyzeHistoryPanel logs={historyLogs} onView={handleViewHistory} />

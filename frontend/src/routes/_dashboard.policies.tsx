@@ -1,5 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { useAuth } from '@workos-inc/authkit-react'
+import Loading from '~/components/common/Loading'
 import { PoliciesPanel } from '~/components/dashboard'
 
 export const Route = createFileRoute('/_dashboard/policies')({
@@ -10,11 +11,7 @@ function PoliciesPage() {
   const { user, isLoading } = useAuth()
 
   if (isLoading) {
-    return (
-      <div className="min-h-screen bg-black flex items-center justify-center">
-        <div className="text-white font-mono uppercase tracking-widest text-xs animate-pulse">Loading System...</div>
-      </div>
-    )
+    return <Loading />
   }
 
   if (!user) {
