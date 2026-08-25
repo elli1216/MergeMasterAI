@@ -138,13 +138,41 @@ export const logAnalysisDecision = mutation({
 
     const snapshot = args.snapshot_review ?? pr.full_review
     const riskScore = args.risk_score ?? pr.risk_score ?? snapshot?.risk_score
+    const targetStatus = args.status ?? pr.status
+    const currentSha = snapshot?.head_sha
+
+    // Deduplicate: If an identical decision for this PR was logged within the last 60 seconds (or with the same commit SHA and decision), update snapshot instead of creating duplicate records
+    const recentLogs = await ctx.db
+      .query('ai_decisions_log')
+      .withIndex('by_pr_id', (q) => q.eq('pr_id', pr._id))
+      .order('desc')
+      .take(5)
+
+    const recentLog = recentLogs[0]
+    const isDuplicate =
+      recentLog &&
+      recentLog.decision_type === args.decision_type &&
+      recentLog.risk_score === riskScore &&
+      ((currentSha && recentLog.snapshot_review?.head_sha === currentSha) ||
+        (Date.now() - recentLog.created_at < 60_000 && recentLog.reasoning === args.reasoning))
+
+    if (isDuplicate) {
+      await ctx.db.patch('ai_decisions_log', recentLog._id, {
+        snapshot_review: snapshot,
+        risk_score: riskScore,
+        status: targetStatus,
+        reasoning: args.reasoning,
+        created_at: Date.now(),
+      })
+      return
+    }
 
     await ctx.db.insert('ai_decisions_log', {
       pr_id: pr._id,
       decision_type: args.decision_type,
       reasoning: args.reasoning,
       risk_score: riskScore,
-      status: args.status ?? pr.status,
+      status: targetStatus,
       snapshot_review: snapshot,
       created_at: Date.now(),
     })

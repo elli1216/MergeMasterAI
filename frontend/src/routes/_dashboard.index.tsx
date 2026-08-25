@@ -3,14 +3,9 @@ import { useMutation } from 'convex/react'
 import { useQueryClient, useSuspenseQuery } from '@tanstack/react-query'
 import { convexQuery } from '@convex-dev/react-query'
 import { useAuth } from '@workos-inc/authkit-react'
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import { api } from '../../convex/_generated/api'
 import type { Doc } from '../../convex/_generated/dataModel'
-import type {
-  ReviewTarget,
-  AnalysisHistoryRecord,
-} from '~/components/dashboard'
-import type { AiReview } from '~/lib/backend'
 import {
   AiReviewDialog,
   AnalysisHistoryDialog,
@@ -19,7 +14,7 @@ import {
   PullRequestsPanel,
   StatsGrid,
 } from '~/components/dashboard'
-import { requestAiReview } from '~/lib/backend'
+import { useReviewStore, useHistoryStore } from '~/store'
 import { LandingView } from '~/components/landing/landingView'
 import Loading from '~/components/common/Loading'
 
@@ -73,74 +68,29 @@ function Dashboard() {
   )
   const queryClient = useQueryClient()
 
-  // Live PR Review Dialog State
-  const [reviewTarget, setReviewTarget] = useState<ReviewTarget | null>(null)
-  const [review, setReview] = useState<AiReview | null>(null)
-  const [reviewing, setReviewing] = useState(false)
-  const [reviewError, setReviewError] = useState<string | null>(null)
-  const [reviewOpen, setReviewOpen] = useState(false)
+  // Zustand Stores - Atomic Selectors
+  const reviewTarget = useReviewStore((state) => state.reviewTarget)
+  const review = useReviewStore((state) => state.review)
+  const reviewing = useReviewStore((state) => state.reviewing)
+  const reviewError = useReviewStore((state) => state.reviewError)
+  const reviewOpen = useReviewStore((state) => state.reviewOpen)
+  const setReviewOpen = useReviewStore((state) => state.setReviewOpen)
+  const openReviewForPr = useReviewStore((state) => state.openReviewForPr)
+  const reanalyzeCurrentTarget = useReviewStore((state) => state.reanalyzeCurrentTarget)
 
-  // Dedicated Historical Analysis State Modal
-  const [selectedHistoryRecord, setSelectedHistoryRecord] =
-    useState<AnalysisHistoryRecord | null>(null)
-  const [historyDialogOpen, setHistoryDialogOpen] = useState(false)
-
-  const handleViewHistory = (log: any) => {
-    setSelectedHistoryRecord(log as AnalysisHistoryRecord)
-    setHistoryDialogOpen(true)
-  }
+  const selectedHistoryRecord = useHistoryStore((state) => state.selectedHistoryRecord)
+  const historyDialogOpen = useHistoryStore((state) => state.historyDialogOpen)
+  const setHistoryDialogOpen = useHistoryStore((state) => state.setHistoryDialogOpen)
+  const openHistoryDialog = useHistoryStore((state) => state.openHistoryDialog)
 
   const handleReview = async (pr: Doc<'pull_requests'>) => {
-    const prNumber = Number(pr.github_pr_id)
-    if (!Number.isInteger(prNumber)) {
-      setReviewTarget(null)
-      setReview(null)
-      setReviewError(`Invalid PR number for "${pr.title}"`)
-      setReviewing(false)
-      setReviewOpen(true)
-      return
-    }
-    setReviewTarget({ repoName: pr.repo_name, prNumber, title: pr.title })
-    setReviewOpen(true)
-
-    if (pr.full_review) {
-      setReview(pr.full_review as AiReview)
-      setReviewError(null)
-      setReviewing(false)
-      return
-    }
-
-    setReview(null)
-    setReviewError(null)
-    setReviewing(true)
-    try {
-      const result = await requestAiReview(pr.repo_name, prNumber)
-      setReview(result)
-      await queryClient.invalidateQueries()
-    } catch (err) {
-      setReviewError(err instanceof Error ? err.message : String(err))
-    } finally {
-      setReviewing(false)
-    }
+    await openReviewForPr(pr)
+    await queryClient.invalidateQueries()
   }
 
   const handleReanalyze = async () => {
-    if (!reviewTarget || review?.status === 'approved') return
-    setReview(null)
-    setReviewError(null)
-    setReviewing(true)
-    try {
-      const result = await requestAiReview(
-        reviewTarget.repoName,
-        reviewTarget.prNumber,
-      )
-      setReview(result)
-      await queryClient.invalidateQueries()
-    } catch (err) {
-      setReviewError(err instanceof Error ? err.message : String(err))
-    } finally {
-      setReviewing(false)
-    }
+    await reanalyzeCurrentTarget()
+    await queryClient.invalidateQueries()
   }
 
   const activeCount = prs.filter((pr) => pr.status === 'pending').length
@@ -158,7 +108,7 @@ function Dashboard() {
         />
         <PullRequestsPanel prs={prs} onReview={handleReview} />
         <CommitsPanel commits={commits} />
-        <AnalyzeHistoryPanel logs={historyLogs} onView={handleViewHistory} />
+        <AnalyzeHistoryPanel logs={historyLogs} onView={openHistoryDialog} />
       </div>
 
       {/* Live PR Review Dialog */}
@@ -182,3 +132,4 @@ function Dashboard() {
     </>
   )
 }
+

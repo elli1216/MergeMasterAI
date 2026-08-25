@@ -31,6 +31,7 @@ import {
   DialogTitle,
 } from '~/components/ui/dialog'
 import { Button } from '~/components/ui/button'
+import { useReviewStore } from '~/store'
 import ReactMarkdown from 'react-markdown'
 
 const SEVERITY_STYLES: Record<
@@ -138,9 +139,8 @@ export function AiReviewDialog({
   error,
   onReanalyze,
 }: AiReviewDialogProps) {
-  const [activeTab, setActiveTab] = useState<'report' | 'chat' | 'tests'>(
-    'report',
-  )
+  const activeTab = useReviewStore((state) => state.activeTab)
+  const setActiveTab = useReviewStore((state) => state.setActiveTab)
 
   // Chat State
   const [messages, setMessages] = useState<Array<ChatMessage>>([])
