@@ -18,6 +18,7 @@ import { Card, CardContent } from '~/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '~/components/ui/table'
 import { Badge } from '~/components/ui/badge'
 import { Button } from '~/components/ui/button'
+import { usePolicyStore } from '~/store'
 import { PolicyImportExportModal } from './policyImportExportModal'
 
 const SEVERITY_BADGES: Record<string, string> = {
@@ -50,18 +51,30 @@ export function PoliciesPanel({ showHero = false }: PoliciesPanelProps) {
   const seedPolicies = useMutation(api.customPolicies.seedDefaultPolicies)
   const importPolicies = useMutation(api.customPolicies.importPolicies)
 
-  const [isAdding, setIsAdding] = useState(false)
-  const [editingPolicyId, setEditingPolicyId] = useState<Id<'custom_policies'> | null>(null)
-  const [title, setTitle] = useState('')
-  const [description, setDescription] = useState('')
-  const [severity, setSeverity] = useState<'critical' | 'high' | 'medium' | 'low'>('high')
-  const [seeding, setSeeding] = useState(false)
-  const [importExportOpen, setImportExportOpen] = useState(false)
-
-  // Search & Filter State
-  const [searchQuery, setSearchQuery] = useState('')
-  const [severityFilter, setSeverityFilter] = useState<'all' | 'critical' | 'high' | 'medium' | 'low'>('all')
-  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all')
+  // Zustand Policy Store - Atomic Selectors
+  const isAdding = usePolicyStore((state) => state.isAdding)
+  const setIsAdding = usePolicyStore((state) => state.setIsAdding)
+  const editingPolicyId = usePolicyStore((state) => state.editingPolicyId)
+  const setEditingPolicyId = usePolicyStore((state) => state.setEditingPolicyId)
+  const title = usePolicyStore((state) => state.title)
+  const setTitle = usePolicyStore((state) => state.setTitle)
+  const description = usePolicyStore((state) => state.description)
+  const setDescription = usePolicyStore((state) => state.setDescription)
+  const severity = usePolicyStore((state) => state.severity)
+  const setSeverity = usePolicyStore((state) => state.setSeverity)
+  const seeding = usePolicyStore((state) => state.seeding)
+  const setSeeding = usePolicyStore((state) => state.setSeeding)
+  const importExportOpen = usePolicyStore((state) => state.importExportOpen)
+  const setImportExportOpen = usePolicyStore((state) => state.setImportExportOpen)
+  const searchQuery = usePolicyStore((state) => state.searchQuery)
+  const setSearchQuery = usePolicyStore((state) => state.setSearchQuery)
+  const severityFilter = usePolicyStore((state) => state.severityFilter)
+  const setSeverityFilter = usePolicyStore((state) => state.setSeverityFilter)
+  const statusFilter = usePolicyStore((state) => state.statusFilter)
+  const setStatusFilter = usePolicyStore((state) => state.setStatusFilter)
+  const startCreate = usePolicyStore((state) => state.startCreate)
+  const startEditStore = usePolicyStore((state) => state.startEdit)
+  const cancelForm = usePolicyStore((state) => state.cancelForm)
 
   const filteredPolicies = useMemo(() => {
     return policies.filter((p) => {
@@ -107,26 +120,15 @@ export function PoliciesPanel({ showHero = false }: PoliciesPanelProps) {
       })
     }
 
-    setTitle('')
-    setDescription('')
-    setSeverity('high')
-    setIsAdding(false)
+    cancelForm()
   }
 
   const startEdit = (policy: PolicyItem) => {
-    setEditingPolicyId(policy._id)
-    setTitle(policy.title)
-    setDescription(policy.description)
-    setSeverity(policy.severity)
-    setIsAdding(true)
+    startEditStore(policy)
   }
 
   const handleCancelAdd = () => {
-    setIsAdding(false)
-    setEditingPolicyId(null)
-    setTitle('')
-    setDescription('')
-    setSeverity('high')
+    cancelForm()
   }
 
   const handleSeed = async () => {

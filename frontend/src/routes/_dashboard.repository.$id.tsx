@@ -1,20 +1,17 @@
 import { Link, createFileRoute } from '@tanstack/react-router'
-import { useSuspenseQuery } from '@tanstack/react-query'
+import { useQueryClient, useSuspenseQuery } from '@tanstack/react-query'
 import { convexQuery } from '@convex-dev/react-query'
 import { useAuth } from '@workos-inc/authkit-react'
-import { useState } from 'react'
 import { ChevronLeft } from 'lucide-react'
 import { api } from '../../convex/_generated/api'
-import type { ReviewTarget } from '~/components/dashboard'
-import type { AiReview } from '~/lib/backend'
 import type { Id } from '../../convex/_generated/dataModel'
-import { requestAiReview } from '~/lib/backend'
 import {
   AiReviewDialog,
   BranchesPanel,
   CommitsPanel,
   PullRequestsPanel,
 } from '~/components/dashboard'
+import { useReviewStore } from '~/store'
 import Loading from '~/components/common/Loading'
 
 export const Route = createFileRoute('/_dashboard/repository/$id')({
@@ -24,6 +21,7 @@ export const Route = createFileRoute('/_dashboard/repository/$id')({
 function RepositoryDetailPage() {
   const { user, isLoading } = useAuth()
   const { id } = Route.useParams()
+  const queryClient = useQueryClient()
 
   // Note: we have to cast id to Id<'repositories'> for Convex typing
   const { data } = useSuspenseQuery(
@@ -33,11 +31,15 @@ function RepositoryDetailPage() {
   )
   const { repo, prs, commits, branches } = data
 
-  const [reviewTarget, setReviewTarget] = useState<ReviewTarget | null>(null)
-  const [review, setReview] = useState<AiReview | null>(null)
-  const [reviewing, setReviewing] = useState(false)
-  const [reviewError, setReviewError] = useState<string | null>(null)
-  const [reviewOpen, setReviewOpen] = useState(false)
+  // Zustand Review Store - Atomic Selectors
+  const reviewTarget = useReviewStore((state) => state.reviewTarget)
+  const review = useReviewStore((state) => state.review)
+  const reviewing = useReviewStore((state) => state.reviewing)
+  const reviewError = useReviewStore((state) => state.reviewError)
+  const reviewOpen = useReviewStore((state) => state.reviewOpen)
+  const setReviewOpen = useReviewStore((state) => state.setReviewOpen)
+  const openReviewForPr = useReviewStore((state) => state.openReviewForPr)
+  const reanalyzeCurrentTarget = useReviewStore((state) => state.reanalyzeCurrentTarget)
 
   if (isLoading) {
     return <Loading />
@@ -52,54 +54,13 @@ function RepositoryDetailPage() {
   }
 
   const handleReview = async (pr: any) => {
-    const prNumber = Number(pr.github_pr_id)
-    if (!Number.isInteger(prNumber)) {
-      setReviewTarget(null)
-      setReview(null)
-      setReviewError(`Invalid PR number for "${pr.title}"`)
-      setReviewing(false)
-      setReviewOpen(true)
-      return
-    }
-    setReviewTarget({ repoName: pr.repo_name, prNumber, title: pr.title })
-    setReviewOpen(true)
-
-    if (pr.full_review) {
-      setReview(pr.full_review as AiReview)
-      setReviewError(null)
-      setReviewing(false)
-      return
-    }
-
-    setReview(null)
-    setReviewError(null)
-    setReviewing(true)
-    try {
-      const result = await requestAiReview(pr.repo_name, prNumber)
-      setReview(result)
-    } catch (err) {
-      setReviewError(err instanceof Error ? err.message : String(err))
-    } finally {
-      setReviewing(false)
-    }
+    await openReviewForPr(pr)
+    await queryClient.invalidateQueries()
   }
 
   const handleReanalyze = async () => {
-    if (!reviewTarget || review?.status === 'approved') return
-    setReview(null)
-    setReviewError(null)
-    setReviewing(true)
-    try {
-      const result = await requestAiReview(
-        reviewTarget.repoName,
-        reviewTarget.prNumber,
-      )
-      setReview(result)
-    } catch (err) {
-      setReviewError(err instanceof Error ? err.message : String(err))
-    } finally {
-      setReviewing(false)
-    }
+    await reanalyzeCurrentTarget()
+    await queryClient.invalidateQueries()
   }
 
   return (
@@ -141,3 +102,4 @@ function RepositoryDetailPage() {
     </>
   )
 }
+
