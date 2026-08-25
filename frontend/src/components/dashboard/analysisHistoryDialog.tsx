@@ -1,6 +1,4 @@
-'use client'
-
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { formatDistanceToNow, format } from 'date-fns'
 import {
   AlertCircle,
@@ -20,8 +18,15 @@ import {
   Layers,
 } from 'lucide-react'
 import { Badge } from '~/components/ui/badge'
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '~/components/ui/dialog'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '~/components/ui/dialog'
 import { Button } from '~/components/ui/button'
+import { useHistoryStore } from '~/store'
 
 export type AnalysisHistoryRecord = {
   _id: string
@@ -31,7 +36,8 @@ export type AnalysisHistoryRecord = {
   pr_title: string
   pr_author?: string
   current_pr_status?: string
-  decision_type: 'block_merge' | 'route_reviewer' | 'remediate_code' | 'auto_approve'
+  decision_type:
+    'block_merge' | 'route_reviewer' | 'remediate_code' | 'auto_approve'
   reasoning: string
   risk_score?: number
   status?: string
@@ -49,17 +55,41 @@ type AnalysisHistoryDialogProps = {
 }
 
 const SEVERITY_STYLES: Record<string, { badge: string; icon: any }> = {
-  critical: { badge: 'border-red-900 bg-red-950/50 text-red-400', icon: ShieldAlert },
-  high: { badge: 'border-orange-900 bg-orange-950/50 text-orange-400', icon: AlertCircle },
-  medium: { badge: 'border-amber-900 bg-amber-950/50 text-amber-400', icon: AlertTriangle },
-  low: { badge: 'border-zinc-800 bg-zinc-900/50 text-zinc-400', icon: AlertCircle },
+  critical: {
+    badge: 'border-red-900 bg-red-950/50 text-red-400',
+    icon: ShieldAlert,
+  },
+  high: {
+    badge: 'border-orange-900 bg-orange-950/50 text-orange-400',
+    icon: AlertCircle,
+  },
+  medium: {
+    badge: 'border-amber-900 bg-amber-950/50 text-amber-400',
+    icon: AlertTriangle,
+  },
+  low: {
+    badge: 'border-zinc-800 bg-zinc-900/50 text-zinc-400',
+    icon: AlertCircle,
+  },
 }
 
 const DECISION_STYLES: Record<string, { badge: string; label: string }> = {
-  auto_approve: { badge: 'border-green-500/50 text-green-400 bg-green-950/20', label: 'Auto Approved' },
-  block_merge: { badge: 'border-red-500/50 text-red-400 bg-red-950/20', label: 'Blocked' },
-  route_reviewer: { badge: 'border-amber-500/50 text-amber-400 bg-amber-950/20', label: 'Reviewers Routed' },
-  remediate_code: { badge: 'border-blue-500/50 text-blue-400 bg-blue-950/20', label: 'Code Remediated' },
+  auto_approve: {
+    badge: 'border-green-500/50 text-green-400 bg-green-950/20',
+    label: 'Auto Approved',
+  },
+  block_merge: {
+    badge: 'border-red-500/50 text-red-400 bg-red-950/20',
+    label: 'Blocked',
+  },
+  route_reviewer: {
+    badge: 'border-amber-500/50 text-amber-400 bg-amber-950/20',
+    label: 'Reviewers Routed',
+  },
+  remediate_code: {
+    badge: 'border-blue-500/50 text-blue-400 bg-blue-950/20',
+    label: 'Code Remediated',
+  },
 }
 
 function getRiskColor(score: number | null | undefined) {
@@ -75,9 +105,21 @@ export function AnalysisHistoryDialog({
   record,
   allPrHistory = [],
 }: AnalysisHistoryDialogProps) {
-  const [selectedRecordId, setSelectedRecordId] = useState<string | null>(null)
-  const [severityFilter, setSeverityFilter] = useState<'all' | 'critical' | 'high' | 'medium' | 'low'>('all')
+  const selectedRecordId = useHistoryStore((state) => state.selectedRecordId)
+  const setSelectedRecordId = useHistoryStore(
+    (state) => state.setSelectedRecordId,
+  )
+  const severityFilter = useHistoryStore((state) => state.severityFilter)
+  const setSeverityFilter = useHistoryStore((state) => state.setSeverityFilter)
   const [copied, setCopied] = useState(false)
+
+  // Reset selected snapshot when record changes or dialog opens
+  useEffect(() => {
+    if (record?._id) {
+      setSelectedRecordId(record._id)
+      setSeverityFilter('all')
+    }
+  }, [record?._id, open, setSelectedRecordId, setSeverityFilter])
 
   // Filter and sort all history records belonging to the same PR (oldest to newest for the timeline)
   const prTimeline = useMemo(() => {
@@ -85,7 +127,8 @@ export function AnalysisHistoryDialog({
     const matching = allPrHistory.filter(
       (h) =>
         (h.pr_id && record.pr_id && h.pr_id === record.pr_id) ||
-        (h.repo_name === record.repo_name && String(h.github_pr_id) === String(record.github_pr_id)),
+        (h.repo_name === record.repo_name &&
+          String(h.github_pr_id) === String(record.github_pr_id)),
     )
     if (matching.length === 0) return [record]
     return [...matching].sort((a, b) => a.created_at - b.created_at)
@@ -101,14 +144,68 @@ export function AnalysisHistoryDialog({
     return record
   }, [record, selectedRecordId, prTimeline])
 
-  const snapshotReview = currentRecord?.snapshot_review || null
-  const findings: Array<any> = snapshotReview?.findings || []
-  const reviewerRoles: Array<string> = snapshotReview?.reviewer_roles || snapshotReview?.reviewers || []
-  const riskScore = currentRecord?.risk_score ?? snapshotReview?.risk_score ?? 0
+  // Robust parsing of snapshotReview (handle string or object)
+  const snapshotReview = useMemo(() => {
+    const raw = currentRecord?.snapshot_review
+    if (!raw) return null
+    if (typeof raw === 'string') {
+      try {
+        return JSON.parse(raw)
+      } catch {
+        return null
+      }
+    }
+    return raw
+  }, [currentRecord?.snapshot_review])
+
+  // Robust extraction of findings
+  const findings: Array<any> = useMemo(() => {
+    const rawFindings =
+      snapshotReview?.findings || (currentRecord as any)?.findings
+    if (Array.isArray(rawFindings)) return rawFindings
+    if (typeof rawFindings === 'string') {
+      try {
+        const parsed = JSON.parse(rawFindings)
+        if (Array.isArray(parsed)) return parsed
+      } catch {}
+    }
+    return []
+  }, [snapshotReview, currentRecord])
+
+  // Robust extraction of reviewer roles
+  const reviewerRoles: Array<string> = useMemo(() => {
+    const roles =
+      snapshotReview?.reviewers ||
+      snapshotReview?.reviewer_roles ||
+      (currentRecord as any)?.reviewers
+    if (Array.isArray(roles)) return roles
+    return []
+  }, [snapshotReview, currentRecord])
+
+  // Robust extraction of risk score
+  const riskScore = useMemo(() => {
+    if (currentRecord?.risk_score != null) return currentRecord.risk_score
+    if (snapshotReview?.risk_score != null) return snapshotReview.risk_score
+    return 0
+  }, [currentRecord, snapshotReview])
+
+  // Robust extraction of summary reasoning
+  const summaryReasoning = useMemo(() => {
+    return (
+      currentRecord?.reasoning ||
+      snapshotReview?.ai_summary ||
+      snapshotReview?.summary ||
+      snapshotReview?.reasoning ||
+      (currentRecord as any)?.ai_summary ||
+      'No detailed reasoning recorded for this snapshot.'
+    )
+  }, [currentRecord, snapshotReview])
 
   const filteredFindings = useMemo(() => {
     if (severityFilter === 'all') return findings
-    return findings.filter((f) => String(f.severity || '').toLowerCase() === severityFilter)
+    return findings.filter(
+      (f) => String(f.severity || '').toLowerCase() === severityFilter,
+    )
   }, [findings, severityFilter])
 
   const handleCopySummary = () => {
@@ -117,7 +214,7 @@ export function AnalysisHistoryDialog({
 Decision: ${currentRecord.decision_type}
 Risk Score: ${riskScore}/100
 Timestamp: ${format(new Date(currentRecord.created_at), 'yyyy-MM-dd HH:mm:ss')}
-Reasoning: ${currentRecord.reasoning}
+Reasoning: ${summaryReasoning}
 Findings: ${findings.length} flagged`
     navigator.clipboard.writeText(textToCopy).then(() => {
       setCopied(true)
@@ -128,123 +225,148 @@ Findings: ${findings.length} flagged`
   if (!record || !currentRecord) return null
 
   const activeIndex = prTimeline.findIndex((r) => r._id === currentRecord._id)
-  const decisionStyle = DECISION_STYLES[currentRecord.decision_type] || DECISION_STYLES.route_reviewer
+  const decisionStyle =
+    DECISION_STYLES[currentRecord.decision_type] ||
+    DECISION_STYLES.route_reviewer
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] bg-zinc-950 border border-zinc-800 text-white rounded-none p-0 overflow-hidden flex flex-col font-sans">
+      <DialogContent className="w-[96vw] sm:w-[92vw] md:w-[88vw] lg:w-[84vw] xl:w-[80vw] 2xl:w-[74vw] sm:max-w-none md:max-w-4xl lg:max-w-5xl xl:max-w-6xl max-h-[94vh] sm:max-h-[90vh] bg-zinc-950 border border-zinc-800 text-zinc-50 p-0 rounded-none shadow-2xl flex flex-col overflow-hidden font-sans">
         {/* MODAL HEADER */}
-        <DialogHeader className="p-4 sm:p-6 bg-black border-b border-zinc-800 flex flex-col gap-3 shrink-0">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-            <div className="space-y-1">
-              <div className="flex items-center gap-2">
-                <span className="px-2 py-0.5 bg-zinc-900 border border-zinc-800 text-zinc-400 font-mono text-[10px] uppercase tracking-wider flex items-center gap-1.5">
-                  <History size={11} className="text-zinc-400" />
-                  Historical Audit Snapshot
-                </span>
-                <span className="font-mono text-xs text-zinc-400 truncate max-w-[200px] sm:max-w-[300px]">
-                  {currentRecord.repo_name}
-                </span>
-              </div>
-              <DialogTitle className="text-base sm:text-lg font-bold text-white tracking-tight flex items-center gap-2">
-                <span>PR #{currentRecord.github_pr_id}:</span>
-                <span className="truncate">{currentRecord.pr_title}</span>
-              </DialogTitle>
-              <DialogDescription className="font-mono text-xs text-zinc-400 flex items-center gap-2">
-                <Clock size={12} className="shrink-0 text-zinc-400" />
-                <span>
-                  Recorded {format(new Date(currentRecord.created_at), 'PPP pp')} (
-                  {formatDistanceToNow(currentRecord.created_at, { addSuffix: true })})
-                </span>
-              </DialogDescription>
-            </div>
-
-            {/* Quick Actions */}
-            <div className="flex items-center gap-2 self-start sm:self-auto">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleCopySummary}
-                className="bg-zinc-900 border-zinc-800 text-zinc-300 hover:text-white rounded-none font-mono text-xs uppercase h-8 px-3"
-              >
-                {copied ? (
-                  <>
-                    <Check size={12} className="text-emerald-400 mr-1.5" />
-                    <span className="text-emerald-400">Copied</span>
-                  </>
-                ) : (
-                  <>
-                    <Copy size={12} className="mr-1.5" />
-                    <span>Copy Record</span>
-                  </>
-                )}
-              </Button>
-            </div>
-          </div>
-
-          {/* PR STATE ITERATION TIMELINE */}
-          {prTimeline.length > 1 && (
-            <div className="mt-2 pt-3 border-t border-zinc-900 space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="font-mono text-[11px] uppercase tracking-widest text-zinc-400 flex items-center gap-1.5">
-                  <Layers size={11} className="text-zinc-400" />
-                  PR Evolution Timeline ({prTimeline.length} State Iterations)
-                </span>
-                <span className="font-mono text-[10px] text-zinc-400">
-                  Viewing Iteration {activeIndex >= 0 ? activeIndex + 1 : 1} of {prTimeline.length}
-                </span>
+        <div className="border-b border-zinc-800 p-4 sm:p-6 shrink-0 bg-black/50">
+          <DialogHeader>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pr-6">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <span className="px-2 py-0.5 bg-zinc-900 border border-zinc-800 text-zinc-400 font-mono text-[10px] uppercase tracking-wider flex items-center gap-1.5">
+                    <History size={11} className="text-zinc-400" />
+                    Historical Audit Snapshot
+                  </span>
+                  <span className="font-mono text-xs text-zinc-400 truncate max-w-[200px] sm:max-w-[300px]">
+                    {currentRecord.repo_name}
+                  </span>
+                </div>
+                <DialogTitle className="text-base sm:text-lg font-bold text-white tracking-tight flex items-center gap-2">
+                  <span>PR #{currentRecord.github_pr_id}:</span>
+                  <span className="truncate">
+                    {currentRecord.pr_title || 'Pull Request'}
+                  </span>
+                </DialogTitle>
+                <DialogDescription className="font-mono text-xs text-zinc-400 flex items-center gap-2">
+                  <Clock size={12} className="shrink-0 text-zinc-400" />
+                  <span>
+                    Recorded{' '}
+                    {format(new Date(currentRecord.created_at), 'PPP pp')} (
+                    {formatDistanceToNow(currentRecord.created_at, {
+                      addSuffix: true,
+                    })}
+                    )
+                  </span>
+                </DialogDescription>
               </div>
 
-              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-thin">
-                {prTimeline.map((item, idx) => {
-                  const isSelected = item._id === currentRecord._id
-                  const itemDecision = DECISION_STYLES[item.decision_type] || DECISION_STYLES.route_reviewer
-                  const itemScore = item.risk_score ?? item.snapshot_review?.risk_score ?? 0
+              {/* Quick Actions */}
+              <div className="flex items-center gap-2 self-start sm:self-auto shrink-0">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleCopySummary}
+                  className="bg-zinc-900 border-zinc-800 text-zinc-300 hover:text-white rounded-none font-mono text-xs uppercase h-8 px-3"
+                >
+                  {copied ? (
+                    <>
+                      <Check size={12} className="text-emerald-400 mr-1.5" />
+                      <span className="text-emerald-400">Copied</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy size={12} className="mr-1.5" />
+                      <span>Copy Record</span>
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
 
-                  return (
-                    <button
-                      key={item._id}
-                      onClick={() => setSelectedRecordId(item._id)}
-                      className={`flex items-center gap-2 px-2.5 py-1.5 border font-mono text-xs transition-all shrink-0 rounded-none text-left ${
-                        isSelected
-                          ? 'bg-zinc-800 border-zinc-500 text-white shadow-sm ring-1 ring-zinc-400'
-                          : 'bg-zinc-950/80 border-zinc-800 text-zinc-400 hover:border-zinc-700 hover:text-zinc-200'
-                      }`}
-                    >
-                      <span className="text-[10px] text-zinc-400 font-bold">#{idx + 1}</span>
-                      <span className="text-[11px] font-medium">{itemDecision.label}</span>
-                      <span
-                        className={`text-[10px] px-1 py-0.2 border ${
-                          itemScore <= 25
-                            ? 'border-emerald-800 text-emerald-400 bg-emerald-950/40'
-                            : itemScore <= 75
-                            ? 'border-amber-800 text-amber-400 bg-amber-950/40'
-                            : 'border-red-800 text-red-400 bg-red-950/40'
+            {/* PR STATE ITERATION TIMELINE */}
+            {prTimeline.length > 1 && (
+              <div className="mt-3 pt-3 border-t border-zinc-900 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="font-mono text-[11px] uppercase tracking-widest text-zinc-400 flex items-center gap-1.5">
+                    <Layers size={11} className="text-zinc-400" />
+                    PR State Evolution Timeline ({prTimeline.length} Iterations
+                    Logged)
+                  </span>
+                  <span className="font-mono text-[10px] text-zinc-400">
+                    Viewing Iteration {activeIndex >= 0 ? activeIndex + 1 : 1}{' '}
+                    of {prTimeline.length}
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar">
+                  {prTimeline.map((item, idx) => {
+                    const isSelected = item._id === currentRecord._id
+                    const itemDecision =
+                      DECISION_STYLES[item.decision_type] ||
+                      DECISION_STYLES.route_reviewer
+                    const itemScore =
+                      item.risk_score ?? item.snapshot_review?.risk_score ?? 0
+
+                    return (
+                      <button
+                        key={item._id}
+                        onClick={() => setSelectedRecordId(item._id)}
+                        className={`flex items-center gap-2 px-2.5 py-1.5 border font-mono text-xs transition-all shrink-0 rounded-none text-left ${
+                          isSelected
+                            ? 'bg-zinc-800 border-zinc-400 text-white shadow-sm ring-1 ring-zinc-400'
+                            : 'bg-zinc-950/80 border-zinc-800 text-zinc-400 hover:border-zinc-700 hover:text-zinc-200'
                         }`}
                       >
-                        Risk {itemScore}
-                      </span>
-                      {idx < prTimeline.length - 1 && (
-                        <ArrowRight size={10} className="text-zinc-700 ml-1 shrink-0" />
-                      )}
-                    </button>
-                  )
-                })}
+                        <span className="text-[10px] text-zinc-400 font-bold">
+                          #{idx + 1}
+                        </span>
+                        <span className="text-[11px] font-medium">
+                          {itemDecision.label}
+                        </span>
+                        <span
+                          className={`text-[10px] px-1 py-0.2 border ${
+                            itemScore <= 25
+                              ? 'border-emerald-800 text-emerald-400 bg-emerald-950/40'
+                              : itemScore <= 75
+                                ? 'border-amber-800 text-amber-400 bg-amber-950/40'
+                                : 'border-red-800 text-red-400 bg-red-950/40'
+                          }`}
+                        >
+                          Risk {itemScore}
+                        </span>
+                        {idx < prTimeline.length - 1 && (
+                          <ArrowRight
+                            size={10}
+                            className="text-zinc-700 ml-1 shrink-0"
+                          />
+                        )}
+                      </button>
+                    )
+                  })}
+                </div>
               </div>
-            </div>
-          )}
-        </DialogHeader>
+            )}
+          </DialogHeader>
+        </div>
 
-        {/* MODAL BODY */}
-        <div className="p-4 sm:p-6 overflow-y-auto space-y-6 flex-1 bg-zinc-950">
+        {/* MODAL BODY (Scrollable with min-h-0) */}
+        <div className="p-4 sm:p-6 md:p-8 overflow-y-auto min-h-0 space-y-6 flex-1 bg-zinc-950">
           {/* STATS & DECISION CARDS */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
             <div className="p-4 border border-zinc-800 bg-black/60 space-y-1">
               <span className="font-mono text-[10px] uppercase tracking-widest text-zinc-400">
-                Decision at this State
+                Decision at this Snapshot
               </span>
               <div className="pt-1">
-                <Badge variant="outline" className={`font-mono text-xs uppercase tracking-wider ${decisionStyle.badge} rounded-none`}>
+                <Badge
+                  variant="outline"
+                  className={`font-mono text-xs uppercase tracking-wider ${decisionStyle.badge} rounded-none`}
+                >
                   {decisionStyle.label}
                 </Badge>
               </div>
@@ -255,7 +377,9 @@ Findings: ${findings.length} flagged`
                 Risk Score at Snapshot
               </span>
               <div className="flex items-baseline gap-1.5 pt-1">
-                <span className={`text-2xl font-black font-mono tracking-tight ${getRiskColor(riskScore)}`}>
+                <span
+                  className={`text-2xl font-black font-mono tracking-tight ${getRiskColor(riskScore)}`}
+                >
                   {riskScore}
                 </span>
                 <span className="text-zinc-600 font-mono text-xs">/ 100</span>
@@ -264,7 +388,7 @@ Findings: ${findings.length} flagged`
 
             <div className="p-4 border border-zinc-800 bg-black/60 space-y-1">
               <span className="font-mono text-[10px] uppercase tracking-widest text-zinc-400">
-                Flagged Violations
+                Recorded Violations
               </span>
               <div className="flex items-baseline gap-1.5 pt-1">
                 <span className="text-2xl font-black font-mono tracking-tight text-white">
@@ -282,7 +406,7 @@ Findings: ${findings.length} flagged`
               Recorded Analysis Reasoning & Summary
             </span>
             <p className="text-sm font-sans text-zinc-200 leading-relaxed whitespace-pre-wrap">
-              {currentRecord.reasoning || snapshotReview?.summary || snapshotReview?.ai_summary || 'No detailed reasoning recorded for this snapshot.'}
+              {summaryReasoning}
             </p>
           </div>
 
@@ -336,7 +460,8 @@ Findings: ${findings.length} flagged`
                   Point-in-Time Findings & Violations
                 </p>
                 <p className="text-[11px] text-zinc-400 font-mono">
-                  Showing {filteredFindings.length} of {findings.length} findings in this state
+                  Showing {filteredFindings.length} of {findings.length}{' '}
+                  findings in this snapshot
                 </p>
               </div>
 
@@ -345,25 +470,31 @@ Findings: ${findings.length} flagged`
                   <span className="text-[10px] font-mono text-zinc-400 px-1 flex items-center gap-1">
                     <Filter size={10} />
                   </span>
-                  {(['all', 'critical', 'high', 'medium', 'low'] as const).map((sev) => {
-                    const count = sev === 'all'
-                      ? findings.length
-                      : findings.filter((f) => String(f.severity || '').toLowerCase() === sev).length
-                    if (sev !== 'all' && count === 0) return null
-                    return (
-                      <button
-                        key={sev}
-                        onClick={() => setSeverityFilter(sev)}
-                        className={`px-2 py-0.5 font-mono text-[10px] uppercase transition-colors rounded-none ${
-                          severityFilter === sev
-                            ? 'bg-zinc-200 text-black font-bold'
-                            : 'text-zinc-400 hover:text-white bg-zinc-900/60'
-                        }`}
-                      >
-                        {sev} {count > 0 && `(${count})`}
-                      </button>
-                    )
-                  })}
+                  {(['all', 'critical', 'high', 'medium', 'low'] as const).map(
+                    (sev) => {
+                      const count =
+                        sev === 'all'
+                          ? findings.length
+                          : findings.filter(
+                              (f) =>
+                                String(f.severity || '').toLowerCase() === sev,
+                            ).length
+                      if (sev !== 'all' && count === 0) return null
+                      return (
+                        <button
+                          key={sev}
+                          onClick={() => setSeverityFilter(sev)}
+                          className={`px-2 py-0.5 font-mono text-[10px] uppercase transition-colors rounded-none ${
+                            severityFilter === sev
+                              ? 'bg-zinc-200 text-black font-bold'
+                              : 'text-zinc-400 hover:text-white bg-zinc-900/60'
+                          }`}
+                        >
+                          {sev} {count > 0 && `(${count})`}
+                        </button>
+                      )
+                    },
+                  )}
                 </div>
               )}
             </div>
@@ -410,14 +541,19 @@ Findings: ${findings.length} flagged`
                           {finding.file && (
                             <div className="flex items-center gap-1.5 px-2 py-0.5 bg-black/60 border border-zinc-900 text-zinc-400 max-w-full sm:max-w-[220px]">
                               <FileCode2 size={11} className="shrink-0" />
-                              <span className="truncate font-mono text-[10px]" title={finding.file}>
+                              <span
+                                className="truncate font-mono text-[10px]"
+                                title={finding.file}
+                              >
                                 {finding.file}
                               </span>
                             </div>
                           )}
                         </div>
                         <p className="text-xs sm:text-sm text-zinc-300 font-sans leading-relaxed">
-                          {finding.detail || finding.message || 'No detail provided.'}
+                          {finding.detail ||
+                            finding.message ||
+                            'No detail provided.'}
                         </p>
                       </div>
                     </div>
@@ -431,7 +567,9 @@ Findings: ${findings.length} flagged`
           {currentRecord.overridden_by_name && (
             <div className="p-3 border border-amber-900/40 bg-amber-950/10 text-amber-400 font-mono text-xs flex items-center justify-between">
               <span>Decision overridden by human supervisor:</span>
-              <span className="font-bold">{currentRecord.overridden_by_name}</span>
+              <span className="font-bold">
+                {currentRecord.overridden_by_name}
+              </span>
             </div>
           )}
         </div>

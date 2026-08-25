@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useMemo } from 'react'
 import {
   Activity,
   Flame,
@@ -22,6 +22,7 @@ import { formatDistanceToNow, parseISO } from 'date-fns'
 import { Card } from '~/components/ui/card'
 import { Badge } from '~/components/ui/badge'
 import { Button } from '~/components/ui/button'
+import { useActivityStore } from '~/store'
 
 type ActivityStats = {
   profile: {
@@ -101,7 +102,8 @@ export function ActivityPanel({
   onRefresh,
   error,
 }: ActivityPanelProps) {
-  const [filterType, setFilterType] = useState<string>('all')
+  const filterType = useActivityStore((state) => state.filterType)
+  const setFilterType = useActivityStore((state) => state.setFilterType)
 
   const filteredFeed = useMemo(() => {
     if (!data?.recentActivity) return []

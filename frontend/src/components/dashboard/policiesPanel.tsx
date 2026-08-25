@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useMemo } from 'react'
 import { useMutation, useQuery } from 'convex/react'
 import {
   Plus,
@@ -15,9 +15,17 @@ import {
 import { api } from '../../../convex/_generated/api'
 import type { Id } from '../../../convex/_generated/dataModel'
 import { Card, CardContent } from '~/components/ui/card'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '~/components/ui/table'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '~/components/ui/table'
 import { Badge } from '~/components/ui/badge'
 import { Button } from '~/components/ui/button'
+import { usePolicyStore } from '~/store'
 import { PolicyImportExportModal } from './policyImportExportModal'
 
 const SEVERITY_BADGES: Record<string, string> = {
@@ -42,7 +50,8 @@ type PoliciesPanelProps = {
 }
 
 export function PoliciesPanel({ showHero = false }: PoliciesPanelProps) {
-  const policies = (useQuery(api.customPolicies.getPolicies) || []) as Array<PolicyItem>
+  const policies = (useQuery(api.customPolicies.getPolicies) ||
+    []) as Array<PolicyItem>
   const createPolicy = useMutation(api.customPolicies.createPolicy)
   const updatePolicy = useMutation(api.customPolicies.updatePolicy)
   const togglePolicy = useMutation(api.customPolicies.togglePolicy)
@@ -50,18 +59,31 @@ export function PoliciesPanel({ showHero = false }: PoliciesPanelProps) {
   const seedPolicies = useMutation(api.customPolicies.seedDefaultPolicies)
   const importPolicies = useMutation(api.customPolicies.importPolicies)
 
-  const [isAdding, setIsAdding] = useState(false)
-  const [editingPolicyId, setEditingPolicyId] = useState<Id<'custom_policies'> | null>(null)
-  const [title, setTitle] = useState('')
-  const [description, setDescription] = useState('')
-  const [severity, setSeverity] = useState<'critical' | 'high' | 'medium' | 'low'>('high')
-  const [seeding, setSeeding] = useState(false)
-  const [importExportOpen, setImportExportOpen] = useState(false)
-
-  // Search & Filter State
-  const [searchQuery, setSearchQuery] = useState('')
-  const [severityFilter, setSeverityFilter] = useState<'all' | 'critical' | 'high' | 'medium' | 'low'>('all')
-  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all')
+  // Zustand Policy Store - Atomic Selectors
+  const isAdding = usePolicyStore((state) => state.isAdding)
+  const setIsAdding = usePolicyStore((state) => state.setIsAdding)
+  const editingPolicyId = usePolicyStore((state) => state.editingPolicyId)
+  const setEditingPolicyId = usePolicyStore((state) => state.setEditingPolicyId)
+  const title = usePolicyStore((state) => state.title)
+  const setTitle = usePolicyStore((state) => state.setTitle)
+  const description = usePolicyStore((state) => state.description)
+  const setDescription = usePolicyStore((state) => state.setDescription)
+  const severity = usePolicyStore((state) => state.severity)
+  const setSeverity = usePolicyStore((state) => state.setSeverity)
+  const seeding = usePolicyStore((state) => state.seeding)
+  const setSeeding = usePolicyStore((state) => state.setSeeding)
+  const importExportOpen = usePolicyStore((state) => state.importExportOpen)
+  const setImportExportOpen = usePolicyStore(
+    (state) => state.setImportExportOpen,
+  )
+  const searchQuery = usePolicyStore((state) => state.searchQuery)
+  const setSearchQuery = usePolicyStore((state) => state.setSearchQuery)
+  const severityFilter = usePolicyStore((state) => state.severityFilter)
+  const setSeverityFilter = usePolicyStore((state) => state.setSeverityFilter)
+  const statusFilter = usePolicyStore((state) => state.statusFilter)
+  const setStatusFilter = usePolicyStore((state) => state.setStatusFilter)
+  const startEditStore = usePolicyStore((state) => state.startEdit)
+  const cancelForm = usePolicyStore((state) => state.cancelForm)
 
   const filteredPolicies = useMemo(() => {
     return policies.filter((p) => {
@@ -107,26 +129,15 @@ export function PoliciesPanel({ showHero = false }: PoliciesPanelProps) {
       })
     }
 
-    setTitle('')
-    setDescription('')
-    setSeverity('high')
-    setIsAdding(false)
+    cancelForm()
   }
 
   const startEdit = (policy: PolicyItem) => {
-    setEditingPolicyId(policy._id)
-    setTitle(policy.title)
-    setDescription(policy.description)
-    setSeverity(policy.severity)
-    setIsAdding(true)
+    startEditStore(policy)
   }
 
   const handleCancelAdd = () => {
-    setIsAdding(false)
-    setEditingPolicyId(null)
-    setTitle('')
-    setDescription('')
-    setSeverity('high')
+    cancelForm()
   }
 
   const handleSeed = async () => {
@@ -142,12 +153,20 @@ export function PoliciesPanel({ showHero = false }: PoliciesPanelProps) {
     await deletePolicy({ policyId: id })
   }
 
-  const handleToggle = async (id: Id<'custom_policies'>, currentActive: boolean) => {
+  const handleToggle = async (
+    id: Id<'custom_policies'>,
+    currentActive: boolean,
+  ) => {
     await togglePolicy({ policyId: id, is_active: !currentActive })
   }
 
   const handleImportBatch = async (
-    items: Array<{ title: string; description: string; severity: 'critical' | 'high' | 'medium' | 'low'; is_active?: boolean }>,
+    items: Array<{
+      title: string
+      description: string
+      severity: 'critical' | 'high' | 'medium' | 'low'
+      is_active?: boolean
+    }>,
     mode: 'append' | 'replace',
   ) => {
     return await importPolicies({
@@ -169,7 +188,9 @@ export function PoliciesPanel({ showHero = false }: PoliciesPanelProps) {
             Organizational Coding Policies
           </h1>
           <p className="text-xs sm:text-sm text-zinc-400 max-w-3xl leading-relaxed font-sans">
-            Define custom architectural, security, and quality constraints. MergeMaster AI's autonomous Analyst agent actively enforces these policies during diff analysis and risk scoring.
+            Define custom architectural, security, and quality constraints.
+            MergeMaster AI's autonomous Analyst agent actively enforces these
+            policies during diff analysis and risk scoring.
           </p>
         </div>
       )}
@@ -231,7 +252,11 @@ export function PoliciesPanel({ showHero = false }: PoliciesPanelProps) {
             }}
             className="bg-white text-black hover:bg-zinc-200 rounded-none font-mono text-xs uppercase tracking-wider font-bold"
           >
-            {isAdding ? <X className="w-3.5 h-3.5 mr-1.5" /> : <Plus className="w-3.5 h-3.5 mr-1.5" />}
+            {isAdding ? (
+              <X className="w-3.5 h-3.5 mr-1.5" />
+            ) : (
+              <Plus className="w-3.5 h-3.5 mr-1.5" />
+            )}
             {isAdding ? 'Cancel' : 'Add Policy'}
           </Button>
         </div>
@@ -243,7 +268,9 @@ export function PoliciesPanel({ showHero = false }: PoliciesPanelProps) {
           <div className="flex items-center justify-between border-b border-zinc-800 pb-3 mb-4">
             <span className="font-mono text-xs uppercase tracking-widest text-zinc-300 font-bold flex items-center gap-2">
               {editingPolicyId ? <Edit2 size={13} /> : <Plus size={13} />}
-              {editingPolicyId ? 'Edit Coding Policy' : 'Create New Coding Policy'}
+              {editingPolicyId
+                ? 'Edit Coding Policy'
+                : 'Create New Coding Policy'}
             </span>
             <button
               onClick={handleCancelAdd}
@@ -325,7 +352,10 @@ export function PoliciesPanel({ showHero = false }: PoliciesPanelProps) {
       {policies.length > 0 && (
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-zinc-950 p-3 border border-zinc-800">
           <div className="relative flex-1 max-w-md">
-            <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
+            <Search
+              size={13}
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500"
+            />
             <input
               type="text"
               placeholder="Search policies by title or rule description..."
@@ -351,7 +381,9 @@ export function PoliciesPanel({ showHero = false }: PoliciesPanelProps) {
                   key={st}
                   onClick={() => setStatusFilter(st)}
                   className={`px-2.5 py-1 text-[10px] font-mono uppercase tracking-wider transition-colors ${
-                    statusFilter === st ? 'bg-zinc-200 text-black font-bold' : 'text-zinc-400 hover:text-white'
+                    statusFilter === st
+                      ? 'bg-zinc-200 text-black font-bold'
+                      : 'text-zinc-400 hover:text-white'
                   }`}
                 >
                   {st}
@@ -364,17 +396,21 @@ export function PoliciesPanel({ showHero = false }: PoliciesPanelProps) {
               <span className="text-[10px] font-mono text-zinc-600 px-1.5 flex items-center">
                 <Filter size={10} />
               </span>
-              {(['all', 'critical', 'high', 'medium', 'low'] as const).map((sev) => (
-                <button
-                  key={sev}
-                  onClick={() => setSeverityFilter(sev)}
-                  className={`px-2 py-1 text-[10px] font-mono uppercase tracking-wider transition-colors ${
-                    severityFilter === sev ? 'bg-zinc-200 text-black font-bold' : 'text-zinc-400 hover:text-white'
-                  }`}
-                >
-                  {sev}
-                </button>
-              ))}
+              {(['all', 'critical', 'high', 'medium', 'low'] as const).map(
+                (sev) => (
+                  <button
+                    key={sev}
+                    onClick={() => setSeverityFilter(sev)}
+                    className={`px-2 py-1 text-[10px] font-mono uppercase tracking-wider transition-colors ${
+                      severityFilter === sev
+                        ? 'bg-zinc-200 text-black font-bold'
+                        : 'text-zinc-400 hover:text-white'
+                    }`}
+                  >
+                    {sev}
+                  </button>
+                ),
+              )}
             </div>
           </div>
         </div>
@@ -413,15 +449,23 @@ export function PoliciesPanel({ showHero = false }: PoliciesPanelProps) {
                     <TableCell>
                       <button
                         type="button"
-                        onClick={() => handleToggle(policy._id, policy.is_active)}
+                        onClick={() =>
+                          handleToggle(policy._id, policy.is_active)
+                        }
                         className={`flex items-center gap-1.5 px-2 py-1 border font-mono text-[10px] uppercase transition-all cursor-pointer rounded-none ${
                           policy.is_active
                             ? 'border-emerald-800 bg-emerald-950/30 text-emerald-400'
                             : 'border-zinc-800 bg-zinc-900/40 text-zinc-500'
                         }`}
-                        title={policy.is_active ? 'Active (click to disable)' : 'Disabled (click to enable)'}
+                        title={
+                          policy.is_active
+                            ? 'Active (click to disable)'
+                            : 'Disabled (click to enable)'
+                        }
                       >
-                        <span className={`w-1.5 h-1.5 rounded-full ${policy.is_active ? 'bg-emerald-400 animate-pulse' : 'bg-zinc-600'}`} />
+                        <span
+                          className={`w-1.5 h-1.5 rounded-full ${policy.is_active ? 'bg-emerald-400 animate-pulse' : 'bg-zinc-600'}`}
+                        />
                         <span>{policy.is_active ? 'Active' : 'Off'}</span>
                       </button>
                     </TableCell>
@@ -432,7 +476,8 @@ export function PoliciesPanel({ showHero = false }: PoliciesPanelProps) {
                       <Badge
                         variant="outline"
                         className={`rounded-none font-mono text-[9px] uppercase tracking-wider ${
-                          SEVERITY_BADGES[policy.severity] || SEVERITY_BADGES.low
+                          SEVERITY_BADGES[policy.severity] ||
+                          SEVERITY_BADGES.low
                         }`}
                       >
                         {policy.severity}
