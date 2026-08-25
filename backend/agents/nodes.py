@@ -181,6 +181,7 @@ async def enforce_gate(state: PipelineState) -> PipelineState:
         summary=state["ai_summary"],
         github_token=state.get("github_token"),
         findings=state.get("findings", []),
+        reviewers=state.get("reviewers", []),
     )
     return state
 

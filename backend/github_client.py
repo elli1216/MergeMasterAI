@@ -119,8 +119,9 @@ def enforce_gate(
     summary: str,
     github_token: str | None = None,
     findings: list | None = None,
+    reviewers: list | None = None,
 ) -> None:
-    """Set the GitHub commit status gate and consolidate blocker issues on GitHub."""
+    """Set the GitHub commit status gate, post/update PR sticky review comments, and manage blocker issues."""
     owner, repo = repo_name.split("/", 1)
     token = github_token or get_installation_token(owner) or getattr(config, "GITHUB_TOKEN", None)
     if not token:
@@ -129,6 +130,7 @@ def enforce_gate(
     gh = Github(token)
     gh_repo = gh.get_repo(repo_name)
 
+    # 1. Commit Status Check
     gate_state = {
         "approved": "success",
         "pending": "pending",
@@ -147,29 +149,88 @@ def enforce_gate(
     except Exception as exc:
         logger.warning("failed to set commit status: %s", exc)
 
+    # 2. Build Findings Table (if any)
+    findings_list = findings or []
+    findings_table = ""
+    if findings_list:
+        rows = []
+        for f in findings_list:
+            f_dict = f.model_dump() if hasattr(f, "model_dump") else (f if isinstance(f, dict) else {})
+            severity = str(f_dict.get("severity", "high")).upper()
+            category = str(f_dict.get("category", "security"))
+            file_path = str(f_dict.get("file", ""))
+            detail = str(f_dict.get("detail", ""))
+            icon = "🔴" if severity == "CRITICAL" else ("🟡" if severity == "HIGH" else "⚪")
+            rows.append(f"| {icon} **{severity}** | {category} | `{file_path}` | {detail} |")
+        findings_table = (
+            "### ⚠️ Findings & Advisory Analysis\n"
+            "| Severity | Category | Target File | Issue Description |\n"
+            "| :--- | :--- | :--- | :--- |\n" + "\n".join(rows) + "\n\n"
+        )
+
+    # 3. Post / Update Sticky PR Review Comment on PR Conversation Thread
+    comment_tag = "<!-- mergemaster-pr-review-gate -->"
+    if status == "approved":
+        status_badge = "✅ **AUTO-APPROVED**"
+    elif status == "blocked":
+        status_badge = "🛑 **MERGE BLOCKED**"
+    else:
+        status_badge = "⏳ **PENDING HUMAN REVIEW**"
+
+    reviewers_str = ", ".join(f"`{r}`" for r in (reviewers or [])) if reviewers else "*None required (Auto)*"
+
+    pr_comment_body = (
+        f"{comment_tag}\n"
+        f"## 🤖 MergeMaster AI Gatekeeper Assessment\n\n"
+        f"| **Gate Status** | **Risk Score** | **Reviewer Routing** |\n"
+        f"| :--- | :--- | :--- |\n"
+        f"| {status_badge} | `{risk_score}/100` | {reviewers_str} |\n\n"
+        f"### 📋 AI Decision Summary\n"
+        f"{summary}\n\n"
+    )
+    if findings_table:
+        pr_comment_body += f"{findings_table}\n"
+
+    pr_comment_body += "### 🛠️ Recommended Actions\n"
+    if status == "blocked":
+        pr_comment_body += (
+            "- 🔴 **Resolve Blocking Vulnerabilities:** Address the critical findings above or check if an automated remediation commit was pushed.\n"
+            "- 💬 **PR Copilot:** Open the MergeMaster dashboard to explore AI refactoring and debugging assistance.\n"
+        )
+    elif status == "pending":
+        pr_comment_body += (
+            f"- 👥 **Human Review Required:** Assigned reviewers ({reviewers_str}) please inspect the diff and approve on GitHub.\n"
+            "- 🧪 **Unit Tests:** You can generate and commit unit tests directly from the MergeMaster dashboard.\n"
+        )
+    else:  # approved
+        pr_comment_body += (
+            "- ✅ **Ready to Merge:** No critical security risks or blocking policies detected. Safe to merge!\n"
+        )
+
+    pr_comment_body += "\n---\n*Automated gatekeeper analysis powered by **IBM Granite** & **LangGraph**.*"
+
+    try:
+        pr = gh_repo.get_pull(int(pr_number))
+        existing_comment = None
+        for c in itertools.islice(pr.get_issue_comments(), 0, 50):
+            if comment_tag in (c.body or ""):
+                existing_comment = c
+                break
+
+        if existing_comment:
+            existing_comment.edit(pr_comment_body)
+            logger.info("Updated existing MergeMaster PR comment on PR #%s", pr_number)
+        else:
+            pr.create_issue_comment(pr_comment_body)
+            logger.info("Posted new MergeMaster PR review comment on PR #%s", pr_number)
+    except Exception as exc:
+        logger.warning("failed to post/update PR review comment on PR #%s: %s", pr_number, exc)
+
+    # 4. Manage Blocker Issues (if BLOCKED) or auto-close when resolved
     issue_prefix = f"[MergeMaster] Blocker on PR #{pr_number}"
 
     if status == "blocked":
         try:
-            # Build 1 single consolidated issue body containing all issues/findings
-            findings_list = findings or []
-            findings_table = ""
-            if findings_list:
-                rows = []
-                for f in findings_list:
-                    f_dict = f.model_dump() if hasattr(f, "model_dump") else (f if isinstance(f, dict) else {})
-                    severity = str(f_dict.get("severity", "high")).upper()
-                    category = str(f_dict.get("category", "security"))
-                    file_path = str(f_dict.get("file", ""))
-                    detail = str(f_dict.get("detail", ""))
-                    icon = "🔴" if severity == "CRITICAL" else ("🟡" if severity == "HIGH" else "⚪")
-                    rows.append(f"| {icon} **{severity}** | {category} | `{file_path}` | {detail} |")
-                findings_table = (
-                    "### ⚠️ Combined Findings & Vulnerabilities\n"
-                    "| Severity | Category | Target File | Issue Description |\n"
-                    "| :--- | :--- | :--- | :--- |\n" + "\n".join(rows) + "\n\n"
-                )
-
             body = (
                 f"## 🛑 MergeMaster AI Release Gate: PR #{pr_number} Blocked\n\n"
                 f"**Risk Score:** `{risk_score}/100`  \n"
@@ -189,7 +250,6 @@ def enforce_gate(
                     break
 
             if existing_issue:
-                # Update existing issue with latest consolidated findings rather than opening duplicate
                 existing_issue.edit(title=title, body=body)
                 logger.info("Updated existing consolidated Blocker issue #%s for PR #%s", existing_issue.number, pr_number)
             else:
@@ -200,7 +260,6 @@ def enforce_gate(
 
     elif status in ("approved", "merged"):
         try:
-            # Automatically close open blocker issue if one exists
             for i in itertools.islice(gh_repo.get_issues(state="open"), 0, 50):
                 if i.title.startswith(issue_prefix):
                     i.create_comment(
@@ -210,4 +269,4 @@ def enforce_gate(
                     i.edit(state="closed")
                     logger.info("Closed resolved Blocker issue #%s for PR #%s", i.number, pr_number)
         except Exception as exc:
-            logger.warning("failed to close resolved Blocker ticket: %s", exc)
+            logger.warning("failed to close resolved Blocker ticket: %s", exc)

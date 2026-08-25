@@ -23,15 +23,40 @@ import {
 import type { AiReview, GeneratedTestSuite } from '~/lib/backend'
 import { askPrCopilot, generatePrTests, pushPrTests } from '~/lib/backend'
 import { Badge } from '~/components/ui/badge'
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '~/components/ui/dialog'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '~/components/ui/dialog'
 import { Button } from '~/components/ui/button'
 import ReactMarkdown from 'react-markdown'
 
-const SEVERITY_STYLES: Record<string, { badge: string; icon: any; color: string }> = {
-  critical: { badge: 'border-red-900 bg-red-950/50 text-red-400', icon: ShieldAlert, color: 'text-red-500' },
-  high: { badge: 'border-orange-900 bg-orange-950/50 text-orange-400', icon: AlertCircle, color: 'text-orange-500' },
-  medium: { badge: 'border-amber-900 bg-amber-950/50 text-amber-400', icon: AlertTriangle, color: 'text-amber-500' },
-  low: { badge: 'border-zinc-800 bg-zinc-900/50 text-zinc-400', icon: AlertCircle, color: 'text-zinc-400' },
+const SEVERITY_STYLES: Record<
+  string,
+  { badge: string; icon: any; color: string }
+> = {
+  critical: {
+    badge: 'border-red-900 bg-red-950/50 text-red-400',
+    icon: ShieldAlert,
+    color: 'text-red-500',
+  },
+  high: {
+    badge: 'border-orange-900 bg-orange-950/50 text-orange-400',
+    icon: AlertCircle,
+    color: 'text-orange-500',
+  },
+  medium: {
+    badge: 'border-amber-900 bg-amber-950/50 text-amber-400',
+    icon: AlertTriangle,
+    color: 'text-amber-500',
+  },
+  low: {
+    badge: 'border-zinc-800 bg-zinc-900/50 text-zinc-400',
+    icon: AlertCircle,
+    color: 'text-zinc-400',
+  },
 }
 
 const STATUS_STYLES: Record<string, string> = {
@@ -52,18 +77,32 @@ function getRiskColor(score: number | null | undefined) {
 function formatCopilotMessage(raw: string): string {
   if (!raw) return ''
   const trimmed = raw.trim()
-  if ((trimmed.startsWith('{') && trimmed.endsWith('}')) || (trimmed.startsWith('```json') && trimmed.endsWith('```'))) {
+  if (
+    (trimmed.startsWith('{') && trimmed.endsWith('}')) ||
+    (trimmed.startsWith('```json') && trimmed.endsWith('```'))
+  ) {
     try {
-      const cleanJson = trimmed.replace(/^```json\s*/i, '').replace(/\s*```$/, '').trim()
+      const cleanJson = trimmed
+        .replace(/^```json\s*/i, '')
+        .replace(/\s*```$/, '')
+        .trim()
       const parsed = JSON.parse(cleanJson)
       if (typeof parsed === 'string') return parsed
-      if (parsed.answer && typeof parsed.answer === 'string') return parsed.answer
-      if (parsed.response && typeof parsed.response === 'string') return parsed.response
-      if (parsed.message && typeof parsed.message === 'string') return parsed.message
-      if (parsed.explanation && typeof parsed.explanation === 'string') return parsed.explanation
-      if (parsed.content && typeof parsed.content === 'string') return parsed.content
+      if (parsed.answer && typeof parsed.answer === 'string')
+        return parsed.answer
+      if (parsed.response && typeof parsed.response === 'string')
+        return parsed.response
+      if (parsed.message && typeof parsed.message === 'string')
+        return parsed.message
+      if (parsed.explanation && typeof parsed.explanation === 'string')
+        return parsed.explanation
+      if (parsed.content && typeof parsed.content === 'string')
+        return parsed.content
       return Object.entries(parsed)
-        .map(([k, v]) => `**${k}**: ${typeof v === 'object' ? JSON.stringify(v, null, 2) : String(v)}`)
+        .map(
+          ([k, v]) =>
+            `**${k}**: ${typeof v === 'object' ? JSON.stringify(v, null, 2) : String(v)}`,
+        )
         .join('\n\n')
     } catch {
       // Not valid JSON, keep as raw string
@@ -99,7 +138,9 @@ export function AiReviewDialog({
   error,
   onReanalyze,
 }: AiReviewDialogProps) {
-  const [activeTab, setActiveTab] = useState<'report' | 'chat' | 'tests'>('report')
+  const [activeTab, setActiveTab] = useState<'report' | 'chat' | 'tests'>(
+    'report',
+  )
 
   // Chat State
   const [messages, setMessages] = useState<Array<ChatMessage>>([])
@@ -109,7 +150,9 @@ export function AiReviewDialog({
   const messagesEndRef = useRef<HTMLDivElement | null>(null)
 
   // Findings Filter State
-  const [severityFilter, setSeverityFilter] = useState<'all' | 'critical' | 'high' | 'medium' | 'low'>('all')
+  const [severityFilter, setSeverityFilter] = useState<
+    'all' | 'critical' | 'high' | 'medium' | 'low'
+  >('all')
 
   // Test Generator State
   const [testSuite, setTestSuite] = useState<GeneratedTestSuite | null>(null)
@@ -139,28 +182,39 @@ export function AiReviewDialog({
   }
 
   // Filtered findings list
-  const filteredFindings = review?.findings.filter((f) => {
-    if (severityFilter === 'all') return true
-    return f.severity.toLowerCase() === severityFilter
-  }) ?? []
+  const filteredFindings =
+    review?.findings.filter((f) => {
+      if (severityFilter === 'all') return true
+      return f.severity.toLowerCase() === severityFilter
+    }) ?? []
 
   // Send a chat message to PR Copilot
   const handleSendMessage = async (customPrompt?: string) => {
     const text = customPrompt || chatInput.trim()
     if (!text || !target) return
 
-    const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    const now = new Date().toLocaleTimeString([], {
+      hour: '2-digit',
+      minute: '2-digit',
+    })
     setMessages((prev) => [...prev, { sender: 'user', text, time: now }])
     if (!customPrompt) setChatInput('')
     setChatLoading(true)
 
     try {
       const answer = await askPrCopilot(target.repoName, target.prNumber, text)
-      setMessages((prev) => [...prev, { sender: 'ai', text: answer, time: now }])
+      setMessages((prev) => [
+        ...prev,
+        { sender: 'ai', text: answer, time: now },
+      ])
     } catch (err) {
       setMessages((prev) => [
         ...prev,
-        { sender: 'ai', text: `Error: ${err instanceof Error ? err.message : String(err)}`, time: now },
+        {
+          sender: 'ai',
+          text: `Error: ${err instanceof Error ? err.message : String(err)}`,
+          time: now,
+        },
       ])
     } finally {
       setChatLoading(false)
@@ -174,7 +228,11 @@ export function AiReviewDialog({
     setTestError(null)
     setPushResult(null)
     try {
-      const result = await generatePrTests(target.repoName, target.prNumber, target.title)
+      const result = await generatePrTests(
+        target.repoName,
+        target.prNumber,
+        target.title,
+      )
       setTestSuite(result)
     } catch (err) {
       setTestError(err instanceof Error ? err.message : String(err))
@@ -189,18 +247,36 @@ export function AiReviewDialog({
     setPushingTests(true)
     setPushResult(null)
     try {
-      const res = await pushPrTests(target.repoName, target.prNumber, testSuite.test_file_path, testSuite.test_code)
+      const res = await pushPrTests(
+        target.repoName,
+        target.prNumber,
+        testSuite.test_file_path,
+        testSuite.test_code,
+      )
       setPushResult(res.message)
     } catch (err) {
-      setPushResult(`Push failed: ${err instanceof Error ? err.message : String(err)}`)
+      setPushResult(
+        `Push failed: ${err instanceof Error ? err.message : String(err)}`,
+      )
     } finally {
       setPushingTests(false)
     }
   }
 
+  const handleOpenChange = (newOpen: boolean) => {
+    if (loading) {
+      // Prevent the user from closing the modal while the AI is analyzing
+      return
+    }
+    onOpenChange(newOpen)
+  }
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[96vw] sm:w-[92vw] md:w-[88vw] lg:w-[84vw] xl:w-[80vw] 2xl:w-[74vw] sm:max-w-none md:max-w-4xl lg:max-w-5xl xl:max-w-6xl 2xl:max-w-7xl max-h-[94vh] sm:max-h-[90vh] bg-zinc-950 border border-zinc-800 text-zinc-50 p-0 rounded-none shadow-2xl flex flex-col overflow-hidden">
+    <Dialog open={open} onOpenChange={handleOpenChange}>
+      <DialogContent
+        showCloseButton={!loading}
+        className="w-[96vw] sm:w-[92vw] md:w-[88vw] lg:w-[84vw] xl:w-[80vw] 2xl:w-[74vw] sm:max-w-none md:max-w-4xl lg:max-w-5xl xl:max-w-6xl 2xl:max-w-7xl max-h-[94vh] sm:max-h-[90vh] bg-zinc-950 border border-zinc-800 text-zinc-50 p-0 rounded-none shadow-2xl flex flex-col overflow-hidden"
+      >
         {/* Header Area */}
         <div className="border-b border-zinc-800 p-4 sm:p-6 shrink-0 bg-black/40">
           <DialogHeader>
@@ -214,8 +290,13 @@ export function AiReviewDialog({
                 </DialogDescription>
               </div>
 
-              {/* Re-analyze Action in Header - Disabled if status is already approved */}
-              {review && !loading && (
+              {/* Status or Actions in Header */}
+              {loading ? (
+                <div className="flex items-center gap-1.5 text-[10px] sm:text-xs font-mono text-amber-400 bg-amber-950/40 border border-amber-800/60 px-2.5 py-1 uppercase tracking-wider">
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+                  <span>Analyzing PR (Modal Locked)</span>
+                </div>
+              ) : review ? (
                 <div className="flex items-center gap-2 pt-1 sm:pt-0">
                   {review.status === 'approved' ? (
                     <div className="flex items-center gap-1.5 text-[10px] sm:text-xs font-mono text-emerald-400 bg-emerald-950/40 border border-emerald-800/60 px-2.5 py-1 uppercase tracking-wider">
@@ -234,7 +315,7 @@ export function AiReviewDialog({
                     </Button>
                   ) : null}
                 </div>
-              )}
+              ) : null}
             </div>
 
             {target && (
@@ -245,7 +326,9 @@ export function AiReviewDialog({
                 <div className="flex items-center gap-2 font-mono text-[11px] sm:text-xs">
                   <span className="text-zinc-500">{target.repoName}</span>
                   <span className="text-zinc-700">•</span>
-                  <span className="text-zinc-300 font-bold">PR #{target.prNumber}</span>
+                  <span className="text-zinc-300 font-bold">
+                    PR #{target.prNumber}
+                  </span>
                 </div>
               </div>
             )}
@@ -255,8 +338,11 @@ export function AiReviewDialog({
           <div className="flex items-center gap-2 mt-4 border-t border-zinc-900 pt-3 overflow-x-auto no-scrollbar">
             <button
               onClick={() => setActiveTab('report')}
-              className={`px-3.5 py-1.5 font-mono text-xs uppercase tracking-widest transition-all flex items-center gap-1.5 shrink-0 rounded-none ${
-                activeTab === 'report' ? 'bg-white text-black font-bold shadow' : 'text-zinc-400 hover:text-white bg-zinc-900/60'
+              disabled={loading}
+              className={`px-3.5 py-1.5 font-mono text-xs uppercase tracking-widest transition-all flex items-center gap-1.5 shrink-0 rounded-none disabled:opacity-50 disabled:cursor-not-allowed ${
+                activeTab === 'report'
+                  ? 'bg-white text-black font-bold shadow'
+                  : 'text-zinc-400 hover:text-white bg-zinc-900/60'
               }`}
             >
               <FileCode2 size={13} />
@@ -265,8 +351,11 @@ export function AiReviewDialog({
 
             <button
               onClick={() => setActiveTab('chat')}
-              className={`px-3.5 py-1.5 font-mono text-xs uppercase tracking-widest transition-all flex items-center gap-1.5 shrink-0 rounded-none ${
-                activeTab === 'chat' ? 'bg-white text-black font-bold shadow' : 'text-zinc-400 hover:text-white bg-zinc-900/60'
+              disabled={loading}
+              className={`px-3.5 py-1.5 font-mono text-xs uppercase tracking-widest transition-all flex items-center gap-1.5 shrink-0 rounded-none disabled:opacity-50 disabled:cursor-not-allowed ${
+                activeTab === 'chat'
+                  ? 'bg-white text-black font-bold shadow'
+                  : 'text-zinc-400 hover:text-white bg-zinc-900/60'
               }`}
             >
               <MessageSquare size={13} />
@@ -280,13 +369,18 @@ export function AiReviewDialog({
 
             <button
               onClick={() => setActiveTab('tests')}
-              className={`px-3.5 py-1.5 font-mono text-xs uppercase tracking-widest transition-all flex items-center gap-1.5 shrink-0 rounded-none ${
-                activeTab === 'tests' ? 'bg-white text-black font-bold shadow' : 'text-zinc-400 hover:text-white bg-zinc-900/60'
+              disabled={loading}
+              className={`px-3.5 py-1.5 font-mono text-xs uppercase tracking-widest transition-all flex items-center gap-1.5 shrink-0 rounded-none disabled:opacity-50 disabled:cursor-not-allowed ${
+                activeTab === 'tests'
+                  ? 'bg-white text-black font-bold shadow'
+                  : 'text-zinc-400 hover:text-white bg-zinc-900/60'
               }`}
             >
               <FlaskConical size={13} />
               <span>Unit Tests</span>
-              {testSuite && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 ml-1" />}
+              {testSuite && (
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 ml-1" />
+              )}
             </button>
           </div>
         </div>
@@ -303,25 +397,38 @@ export function AiReviewDialog({
                     <div className="absolute h-16 w-16 rounded-full border-2 border-transparent border-t-white animate-spin"></div>
                     <div className="absolute h-10 w-10 bg-zinc-900 rounded-full animate-pulse"></div>
                   </div>
-                  <p className="font-mono text-xs uppercase tracking-widest text-zinc-500 animate-pulse text-center">
-                    Analyzing Changes, RAG Memory & Enforcing Policies...
-                  </p>
+                  <div className="text-center space-y-1.5">
+                    <p className="font-mono text-xs uppercase tracking-widest text-zinc-300 font-bold animate-pulse">
+                      Analyzing Changes, RAG Memory & Enforcing Policies...
+                    </p>
+                    <p className="font-mono text-[10px] text-zinc-500 uppercase tracking-wider">
+                      Please wait — modal is locked while AI pipeline is
+                      running.
+                    </p>
+                  </div>
                 </div>
               ) : error ? (
                 <div className="space-y-4 py-16 text-center">
                   <ShieldAlert className="mx-auto h-12 w-12 text-red-500/50" />
                   <div>
-                    <p className="font-mono text-sm uppercase tracking-widest text-red-400">Review Failed</p>
-                    <p className="font-sans text-xs text-zinc-500 mt-2 max-w-md mx-auto">{error}</p>
+                    <p className="font-mono text-sm uppercase tracking-widest text-red-400">
+                      Review Failed
+                    </p>
+                    <p className="font-sans text-xs text-zinc-500 mt-2 max-w-md mx-auto">
+                      {error}
+                    </p>
                   </div>
                 </div>
               ) : review ? (
                 review.error ? (
                   <div className="border border-red-900/50 bg-red-950/20 p-6 text-center">
                     <AlertTriangle className="mx-auto h-8 w-8 text-red-500 mb-3" />
-                    <p className="font-mono text-sm text-red-400">{review.error}</p>
+                    <p className="font-mono text-sm text-red-400">
+                      {review.error}
+                    </p>
                     <p className="mt-2 font-sans text-xs text-zinc-500">
-                      Ensure the backend can reach GitHub for this repository (App installed or valid tokens provided).
+                      Ensure the backend can reach GitHub for this repository
+                      (App installed or valid tokens provided).
                     </p>
                   </div>
                 ) : (
@@ -329,32 +436,46 @@ export function AiReviewDialog({
                     {/* Top Metrics Row */}
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
                       <div className="p-5 border border-zinc-800 bg-zinc-900/30 flex flex-col items-center justify-center text-center">
-                        <p className="font-mono text-[10px] uppercase tracking-widest text-zinc-500 mb-1">Risk Score</p>
-                        <div className={`font-mono text-4xl sm:text-5xl lg:text-6xl font-light tracking-tighter ${getRiskColor(review.risk_score)}`}>
+                        <p className="font-mono text-[10px] uppercase tracking-widest text-zinc-500 mb-1">
+                          Risk Score
+                        </p>
+                        <div
+                          className={`font-mono text-4xl sm:text-5xl lg:text-6xl font-light tracking-tighter ${getRiskColor(review.risk_score)}`}
+                        >
                           {review.risk_score ?? '--'}
-                          <span className="text-xl lg:text-2xl text-zinc-600">%</span>
+                          <span className="text-xl lg:text-2xl text-zinc-600">
+                            %
+                          </span>
                         </div>
                       </div>
 
                       <div className="p-5 border border-zinc-800 bg-zinc-900/30 flex flex-col items-center justify-center text-center">
-                        <p className="font-mono text-[10px] uppercase tracking-widest text-zinc-500 mb-2">Gate Status</p>
+                        <p className="font-mono text-[10px] uppercase tracking-widest text-zinc-500 mb-2">
+                          Gate Status
+                        </p>
                         <Badge
                           variant="outline"
                           className={`px-3 py-1 font-mono text-xs uppercase tracking-widest rounded-none ${
-                            STATUS_STYLES[review.status ?? ''] ?? 'border-zinc-800 text-zinc-600'
+                            STATUS_STYLES[review.status ?? ''] ??
+                            'border-zinc-800 text-zinc-600'
                           }`}
                         >
                           {review.status ?? 'unknown'}
                         </Badge>
                         {review.decision && (
                           <p className="mt-2 text-[10px] font-mono text-zinc-500">
-                            Decision: <span className="text-zinc-300 uppercase">{review.decision}</span>
+                            Decision:{' '}
+                            <span className="text-zinc-300 uppercase">
+                              {review.decision}
+                            </span>
                           </p>
                         )}
                       </div>
 
                       <div className="p-5 border border-zinc-800 bg-zinc-900/30 flex flex-col items-center justify-center text-center">
-                        <p className="font-mono text-[10px] uppercase tracking-widest text-zinc-500 mb-2">Reviewer Routing</p>
+                        <p className="font-mono text-[10px] uppercase tracking-widest text-zinc-500 mb-2">
+                          Reviewer Routing
+                        </p>
                         {review.reviewers.length > 0 ? (
                           <div className="flex flex-wrap gap-1.5 justify-center">
                             {review.reviewers.map((r) => (
@@ -362,13 +483,18 @@ export function AiReviewDialog({
                                 key={r}
                                 className="flex items-center gap-1 bg-zinc-900 border border-zinc-800 px-2.5 py-1 text-[11px] text-zinc-300 font-mono"
                               >
-                                <UserCircle2 size={11} className="text-zinc-500" />
+                                <UserCircle2
+                                  size={11}
+                                  className="text-zinc-500"
+                                />
                                 <span>{r}</span>
                               </div>
                             ))}
                           </div>
                         ) : (
-                          <p className="text-xs text-zinc-600 font-mono italic">No human review required</p>
+                          <p className="text-xs text-zinc-600 font-mono italic">
+                            No human review required
+                          </p>
                         )}
                       </div>
                     </div>
@@ -376,7 +502,9 @@ export function AiReviewDialog({
                     {/* AI Summary */}
                     {review.ai_summary && (
                       <div className="border-l-2 border-zinc-700 bg-black/40 p-4 sm:p-5">
-                        <p className="font-sans text-xs sm:text-sm md:text-base leading-relaxed text-zinc-300">{review.ai_summary}</p>
+                        <p className="font-sans text-xs sm:text-sm md:text-base leading-relaxed text-zinc-300">
+                          {review.ai_summary}
+                        </p>
                       </div>
                     )}
 
@@ -388,7 +516,9 @@ export function AiReviewDialog({
                           <p className="font-mono text-xs uppercase tracking-widest text-amber-400 mb-1">
                             Autonomous Remediation Pushed
                           </p>
-                          <p className="font-sans text-xs sm:text-sm text-amber-200/90 leading-relaxed">{review.remediation_note}</p>
+                          <p className="font-sans text-xs sm:text-sm text-amber-200/90 leading-relaxed">
+                            {review.remediation_note}
+                          </p>
                         </div>
                       </div>
                     )}
@@ -401,7 +531,8 @@ export function AiReviewDialog({
                             Detailed Findings & Violations
                           </p>
                           <p className="text-[11px] text-zinc-600 font-mono">
-                            Showing {filteredFindings.length} of {review.findings.length} findings
+                            Showing {filteredFindings.length} of{' '}
+                            {review.findings.length} findings
                           </p>
                         </div>
 
@@ -411,10 +542,21 @@ export function AiReviewDialog({
                             <span className="text-[10px] font-mono text-zinc-600 px-1 flex items-center gap-1">
                               <Filter size={10} />
                             </span>
-                            {(['all', 'critical', 'high', 'medium', 'low'] as const).map((sev) => {
-                              const count = sev === 'all'
-                                ? review.findings.length
-                                : review.findings.filter((f) => f.severity.toLowerCase() === sev).length
+                            {(
+                              [
+                                'all',
+                                'critical',
+                                'high',
+                                'medium',
+                                'low',
+                              ] as const
+                            ).map((sev) => {
+                              const count =
+                                sev === 'all'
+                                  ? review.findings.length
+                                  : review.findings.filter(
+                                      (f) => f.severity.toLowerCase() === sev,
+                                    ).length
                               if (sev !== 'all' && count === 0) return null
                               return (
                                 <button
@@ -437,16 +579,23 @@ export function AiReviewDialog({
                       {review.findings.length === 0 ? (
                         <div className="text-center py-12 border border-dashed border-zinc-800 bg-zinc-950/50">
                           <CheckCircle2 className="mx-auto h-8 w-8 text-emerald-400/60 mb-2" />
-                          <p className="font-mono text-xs text-zinc-400">Clean code! Zero vulnerabilities or blockers detected.</p>
+                          <p className="font-mono text-xs text-zinc-400">
+                            Clean code! Zero vulnerabilities or blockers
+                            detected.
+                          </p>
                         </div>
                       ) : filteredFindings.length === 0 ? (
                         <div className="text-center py-8 border border-zinc-900 bg-zinc-950/30">
-                          <p className="font-mono text-xs text-zinc-500">No findings with severity "{severityFilter}".</p>
+                          <p className="font-mono text-xs text-zinc-500">
+                            No findings with severity "{severityFilter}".
+                          </p>
                         </div>
                       ) : (
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
                           {filteredFindings.map((finding, i) => {
-                            const style = SEVERITY_STYLES[finding.severity.toLowerCase()] || SEVERITY_STYLES.low
+                            const style =
+                              SEVERITY_STYLES[finding.severity.toLowerCase()] ||
+                              SEVERITY_STYLES.low
                             const Icon = style.icon
                             return (
                               <div
@@ -467,14 +616,22 @@ export function AiReviewDialog({
                                         {finding.category}
                                       </span>
                                     </div>
-                                    <div className="flex items-center gap-1.5 px-2 py-0.5 bg-black/60 border border-zinc-900 text-zinc-400 max-w-full sm:max-w-[240px]">
-                                      <FileCode2 size={11} className="shrink-0" />
-                                      <span className="truncate font-mono text-[10px]" title={finding.file}>
+                                    <div className="flex items-center gap-1.5 px-2 py-0.5 bg-black/60 border border-zinc-900 text-zinc-400 max-w-full sm:max-w-60">
+                                      <FileCode2
+                                        size={11}
+                                        className="shrink-0"
+                                      />
+                                      <span
+                                        className="truncate font-mono text-[10px]"
+                                        title={finding.file}
+                                      >
                                         {finding.file}
                                       </span>
                                     </div>
                                   </div>
-                                  <p className="text-xs sm:text-sm text-zinc-300 font-sans leading-relaxed">{finding.detail}</p>
+                                  <p className="text-xs sm:text-sm text-zinc-300 font-sans leading-relaxed">
+                                    {finding.detail}
+                                  </p>
                                 </div>
                               </div>
                             )
@@ -485,7 +642,9 @@ export function AiReviewDialog({
                   </div>
                 )
               ) : (
-                <p className="py-16 text-center font-mono text-xs text-zinc-600">No review data available.</p>
+                <p className="py-16 text-center font-mono text-xs text-zinc-600">
+                  No review data available.
+                </p>
               )}
             </>
           )}
@@ -505,25 +664,38 @@ export function AiReviewDialog({
                         Interactive PR Copilot
                       </p>
                       <p className="text-xs text-zinc-500 mt-1 max-w-md">
-                        Ask questions about code changes, security risks, logic bugs, or proposed remediations.
+                        Ask questions about code changes, security risks, logic
+                        bugs, or proposed remediations.
                       </p>
                     </div>
                     {/* Suggested Quick Prompts */}
                     <div className="flex flex-wrap gap-2 justify-center pt-2 max-w-lg">
                       <button
-                        onClick={() => handleSendMessage('Can you explain the main security findings in this PR?')}
+                        onClick={() =>
+                          handleSendMessage(
+                            'Can you explain the main security findings in this PR?',
+                          )
+                        }
                         className="text-[11px] font-mono bg-zinc-900 border border-zinc-800 hover:border-zinc-600 text-zinc-400 hover:text-white px-3 py-1.5 transition-colors"
                       >
                         ⚡ Explain security findings
                       </button>
                       <button
-                        onClick={() => handleSendMessage('How should I resolve the flagged issues cleanly?')}
+                        onClick={() =>
+                          handleSendMessage(
+                            'How should I resolve the flagged issues cleanly?',
+                          )
+                        }
                         className="text-[11px] font-mono bg-zinc-900 border border-zinc-800 hover:border-zinc-600 text-zinc-400 hover:text-white px-3 py-1.5 transition-colors"
                       >
                         ⚡ How to resolve issues?
                       </button>
                       <button
-                        onClick={() => handleSendMessage('Why did this change receive this risk score?')}
+                        onClick={() =>
+                          handleSendMessage(
+                            'Why did this change receive this risk score?',
+                          )
+                        }
                         className="text-[11px] font-mono bg-zinc-900 border border-zinc-800 hover:border-zinc-600 text-zinc-400 hover:text-white px-3 py-1.5 transition-colors"
                       >
                         ⚡ Justify risk score
@@ -552,15 +724,21 @@ export function AiReviewDialog({
                       >
                         {msg.sender === 'ai' ? (
                           <div className="prose prose-invert max-w-none text-xs sm:text-sm leading-relaxed text-zinc-200 space-y-2 [&_pre]:bg-black [&_pre]:p-3 [&_pre]:border [&_pre]:border-zinc-800 [&_pre]:overflow-x-auto [&_pre]:my-2 [&_code]:font-mono [&_code]:text-xs [&_code]:text-blue-300 [&_code]:bg-zinc-950/80 [&_code]:px-1 [&_code]:py-0.5 [&_ul]:list-disc [&_ul]:pl-4 [&_ul]:my-2 [&_ol]:list-decimal [&_ol]:pl-4 [&_ol]:my-2 [&_strong]:text-white [&_strong]:font-semibold [&_a]:text-blue-400 [&_p]:mb-2 [&_p:last-child]:mb-0 [&_h1]:text-sm [&_h1]:font-bold [&_h1]:text-white [&_h2]:text-xs [&_h2]:font-bold [&_h2]:text-white [&_h3]:text-xs [&_h3]:font-semibold [&_h3]:text-zinc-300">
-                            <ReactMarkdown>{formatCopilotMessage(msg.text)}</ReactMarkdown>
+                            <ReactMarkdown>
+                              {formatCopilotMessage(msg.text)}
+                            </ReactMarkdown>
                           </div>
                         ) : (
-                          <p className="whitespace-pre-wrap text-xs sm:text-sm">{msg.text}</p>
+                          <p className="whitespace-pre-wrap text-xs sm:text-sm">
+                            {msg.text}
+                          </p>
                         )}
                         <div className="flex items-center justify-between gap-4 mt-2">
                           <span
                             className={`text-[9px] font-mono block ${
-                              msg.sender === 'user' ? 'text-zinc-600' : 'text-zinc-500'
+                              msg.sender === 'user'
+                                ? 'text-zinc-600'
+                                : 'text-zinc-500'
                             }`}
                           >
                             {msg.time}
@@ -573,13 +751,20 @@ export function AiReviewDialog({
                             >
                               {copiedMsgIndex === i ? (
                                 <>
-                                  <Check size={10} className="text-emerald-400" />
-                                  <span className="text-emerald-400 text-[9px] font-mono">Copied</span>
+                                  <Check
+                                    size={10}
+                                    className="text-emerald-400"
+                                  />
+                                  <span className="text-emerald-400 text-[9px] font-mono">
+                                    Copied
+                                  </span>
                                 </>
                               ) : (
                                 <>
                                   <Copy size={10} />
-                                  <span className="text-[9px] font-mono">Copy</span>
+                                  <span className="text-[9px] font-mono">
+                                    Copy
+                                  </span>
                                 </>
                               )}
                             </button>
@@ -603,7 +788,9 @@ export function AiReviewDialog({
                       <span className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-bounce [animation-delay:-0.3s]" />
                       <span className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-bounce [animation-delay:-0.15s]" />
                       <span className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-bounce" />
-                      <span className="text-zinc-500 text-[11px] ml-1.5">Copilot analyzing...</span>
+                      <span className="text-zinc-500 text-[11px] ml-1.5">
+                        Copilot analyzing...
+                      </span>
                     </div>
                   </div>
                 )}
@@ -647,7 +834,8 @@ export function AiReviewDialog({
                     Autonomous Test Suite Synthesizer
                   </h3>
                   <p className="text-xs text-zinc-400 font-mono mt-0.5">
-                    Analyzes touched functions and drafts test suites with assertions and edge cases
+                    Analyzes touched functions and drafts test suites with
+                    assertions and edge cases
                   </p>
                 </div>
                 <Button
@@ -656,7 +844,11 @@ export function AiReviewDialog({
                   className="w-full sm:w-auto bg-white text-black hover:bg-zinc-200 rounded-none font-mono text-xs uppercase tracking-wider shrink-0 font-bold px-4 py-2"
                 >
                   <Sparkles className="w-3.5 h-3.5 mr-1.5" />
-                  {generatingTests ? 'Drafting Tests...' : testSuite ? 'Regenerate Tests' : 'Generate Tests'}
+                  {generatingTests
+                    ? 'Drafting Tests...'
+                    : testSuite
+                      ? 'Regenerate Tests'
+                      : 'Generate Tests'}
                 </Button>
               </div>
 
@@ -684,10 +876,15 @@ export function AiReviewDialog({
                 <div className="space-y-3">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                     <div className="flex items-center gap-2">
-                      <Badge variant="outline" className="font-mono text-[10px] uppercase border-zinc-700 bg-zinc-900 text-zinc-300 rounded-none">
+                      <Badge
+                        variant="outline"
+                        className="font-mono text-[10px] uppercase border-zinc-700 bg-zinc-900 text-zinc-300 rounded-none"
+                      >
                         {testSuite.framework}
                       </Badge>
-                      <code className="text-xs font-mono text-zinc-400 truncate">{testSuite.test_file_path}</code>
+                      <code className="text-xs font-mono text-zinc-400 truncate">
+                        {testSuite.test_file_path}
+                      </code>
                     </div>
                     <div className="flex items-center gap-2">
                       <Button
@@ -698,7 +895,10 @@ export function AiReviewDialog({
                       >
                         {copiedTestCode ? (
                           <>
-                            <Check size={12} className="text-emerald-400 mr-1" />
+                            <Check
+                              size={12}
+                              className="text-emerald-400 mr-1"
+                            />
                             <span className="text-emerald-400">Copied</span>
                           </>
                         ) : (
@@ -715,7 +915,9 @@ export function AiReviewDialog({
                         className="bg-emerald-400 text-black hover:bg-emerald-300 rounded-none font-mono text-xs uppercase tracking-wider font-bold flex items-center justify-center gap-1.5 h-8 px-3"
                       >
                         <GitCommit size={13} />
-                        {pushingTests ? 'Pushing Commit...' : 'Push to PR Branch'}
+                        {pushingTests
+                          ? 'Pushing Commit...'
+                          : 'Push to PR Branch'}
                       </Button>
                     </div>
                   </div>
@@ -735,9 +937,12 @@ export function AiReviewDialog({
               ) : (
                 <div className="text-center py-16 border border-dashed border-zinc-800 bg-zinc-950/50">
                   <FlaskConical className="mx-auto h-8 w-8 text-zinc-600 mb-2" />
-                  <p className="font-mono text-xs text-zinc-400">No test suite drafted for this PR yet.</p>
+                  <p className="font-mono text-xs text-zinc-400">
+                    No test suite drafted for this PR yet.
+                  </p>
                   <p className="text-xs text-zinc-600 mt-1">
-                    Click "Generate Tests" above to draft unit tests tailored to this PR diff.
+                    Click "Generate Tests" above to draft unit tests tailored to
+                    this PR diff.
                   </p>
                 </div>
               )}
