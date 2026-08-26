@@ -16,6 +16,7 @@ import {
   ArrowRight,
   Shield,
   Layers,
+  Sparkles,
 } from 'lucide-react'
 import { Badge } from '~/components/ui/badge'
 import {
@@ -121,6 +122,14 @@ export function AnalysisHistoryDialog({
     }
   }, [record?._id, open, setSelectedRecordId, setSeverityFilter])
 
+  // Reset selected snapshot when record changes or dialog opens
+  useEffect(() => {
+    if (record?._id) {
+      setSelectedRecordId(record._id)
+      setSeverityFilter('all')
+    }
+  }, [record?._id, open, setSelectedRecordId, setSeverityFilter])
+
   // Filter and sort all history records belonging to the same PR (oldest to newest for the timeline)
   const prTimeline = useMemo(() => {
     if (!record) return []
@@ -215,6 +224,7 @@ Decision: ${currentRecord.decision_type}
 Risk Score: ${riskScore}/100
 Timestamp: ${format(new Date(currentRecord.created_at), 'yyyy-MM-dd HH:mm:ss')}
 Reasoning: ${summaryReasoning}
+Reasoning: ${summaryReasoning}
 Findings: ${findings.length} flagged`
     navigator.clipboard.writeText(textToCopy).then(() => {
       setCopied(true)
@@ -231,6 +241,7 @@ Findings: ${findings.length} flagged`
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="w-[96vw] sm:w-[92vw] md:w-[88vw] lg:w-[84vw] xl:w-[80vw] 2xl:w-[74vw] sm:max-w-none md:max-w-4xl lg:max-w-5xl xl:max-w-6xl max-h-[94vh] sm:max-h-[90vh] bg-zinc-950 border border-zinc-800 text-zinc-50 p-0 rounded-none shadow-2xl flex flex-col overflow-hidden font-sans">
       <DialogContent className="w-[96vw] sm:w-[92vw] md:w-[88vw] lg:w-[84vw] xl:w-[80vw] 2xl:w-[74vw] sm:max-w-none md:max-w-4xl lg:max-w-5xl xl:max-w-6xl max-h-[94vh] sm:max-h-[90vh] bg-zinc-950 border border-zinc-800 text-zinc-50 p-0 rounded-none shadow-2xl flex flex-col overflow-hidden font-sans">
         {/* MODAL HEADER */}
         <div className="border-b border-zinc-800 p-4 sm:p-6 shrink-0 bg-black/50">
@@ -265,6 +276,28 @@ Findings: ${findings.length} flagged`
                 </DialogDescription>
               </div>
 
+              {/* Quick Actions */}
+              <div className="flex items-center gap-2 self-start sm:self-auto shrink-0">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleCopySummary}
+                  className="bg-zinc-900 border-zinc-800 text-zinc-300 hover:text-white rounded-none font-mono text-xs uppercase h-8 px-3"
+                >
+                  {copied ? (
+                    <>
+                      <Check size={12} className="text-emerald-400 mr-1.5" />
+                      <span className="text-emerald-400">Copied</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy size={12} className="mr-1.5" />
+                      <span>Copy Record</span>
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
               {/* Quick Actions */}
               <div className="flex items-center gap-2 self-start sm:self-auto shrink-0">
                 <Button
@@ -356,10 +389,14 @@ Findings: ${findings.length} flagged`
 
         {/* MODAL BODY (Scrollable with min-h-0) */}
         <div className="p-4 sm:p-6 md:p-8 overflow-y-auto min-h-0 space-y-6 flex-1 bg-zinc-950">
+        {/* MODAL BODY (Scrollable with min-h-0) */}
+        <div className="p-4 sm:p-6 md:p-8 overflow-y-auto min-h-0 space-y-6 flex-1 bg-zinc-950">
           {/* STATS & DECISION CARDS */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
             <div className="p-4 border border-zinc-800 bg-black/60 space-y-1">
               <span className="font-mono text-[10px] uppercase tracking-widest text-zinc-400">
+                Decision at this Snapshot
                 Decision at this Snapshot
               </span>
               <div className="pt-1">
@@ -389,6 +426,7 @@ Findings: ${findings.length} flagged`
             <div className="p-4 border border-zinc-800 bg-black/60 space-y-1">
               <span className="font-mono text-[10px] uppercase tracking-widest text-zinc-400">
                 Recorded Violations
+                Recorded Violations
               </span>
               <div className="flex items-baseline gap-1.5 pt-1">
                 <span className="text-2xl font-black font-mono tracking-tight text-white">
@@ -406,6 +444,7 @@ Findings: ${findings.length} flagged`
               Recorded Analysis Reasoning & Summary
             </span>
             <p className="text-sm font-sans text-zinc-200 leading-relaxed whitespace-pre-wrap">
+              {summaryReasoning}
               {summaryReasoning}
             </p>
           </div>

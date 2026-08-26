@@ -14,31 +14,36 @@ export const PIPELINE_STAGES: Array<PipelineStage> = [
   {
     id: 1,
     name: 'Extracting Git Diff & Checking Mergeability',
-    subtitle: 'Fetching PR file tree, lines modified, and scanning for merge conflicts from GitHub...',
+    subtitle:
+      'Fetching PR file tree, lines modified, and scanning for merge conflicts from GitHub...',
     log: 'Extracting unified diff and analyzing file boundaries',
   },
   {
     id: 2,
     name: 'Loading Guardrails & Semantic RAG Memory',
-    subtitle: 'Retrieving organizational coding policies and semantic vector embeddings of past PR outcomes...',
+    subtitle:
+      'Retrieving organizational coding policies and semantic vector embeddings of past PR outcomes...',
     log: 'Retrieved active custom guardrails & vector historical context',
   },
   {
     id: 3,
     name: 'Executing IBM Granite Code Analysis',
-    subtitle: 'Autonomous multi-agent inspection of security vulnerabilities, logic bugs, code quality, and risk score...',
+    subtitle:
+      'Autonomous multi-agent inspection of security vulnerabilities, logic bugs, code quality, and risk score...',
     log: 'IBM Granite 3.1 Code & Instruct analyzing diff AST and security risks',
   },
   {
     id: 4,
     name: 'Evaluating Reviewer Routing & Governance',
-    subtitle: 'Mapping modified files against team domain ownership rules and policy constraints...',
+    subtitle:
+      'Mapping modified files against team domain ownership rules and policy constraints...',
     log: 'Matching reviewer ownership rules & determining gate status',
   },
   {
     id: 5,
     name: 'Enforcing Commit Gate & Finalizing Decision',
-    subtitle: 'Setting GitHub commit status checks, drafting surgical fixes, and recording immutable audit log...',
+    subtitle:
+      'Setting GitHub commit status checks, drafting surgical fixes, and recording immutable audit log...',
     log: 'Enforcing commit-status gate and syncing Convex decision snapshot',
   },
 ]
@@ -72,7 +77,9 @@ interface ReviewState {
 
 let stageInterval: any = null
 
-function startStageProgression(set: (fn: (state: ReviewState) => Partial<ReviewState>) => void) {
+function startStageProgression(
+  set: (fn: (state: ReviewState) => Partial<ReviewState>) => void,
+) {
   if (stageInterval) clearInterval(stageInterval)
   set(() => ({ currentStageIndex: 0 }))
   stageInterval = setInterval(() => {
@@ -132,7 +139,11 @@ export const useReviewStore = create<ReviewState>((set, get) => ({
       return
     }
 
-    const target: ReviewTarget = { repoName: pr.repo_name, prNumber, title: pr.title }
+    const target: ReviewTarget = {
+      repoName: pr.repo_name,
+      prNumber,
+      title: pr.title,
+    }
     set({
       reviewTarget: target,
       reviewOpen: true,
@@ -161,7 +172,11 @@ export const useReviewStore = create<ReviewState>((set, get) => ({
 
     try {
       const result = await requestAiReview(pr.repo_name, prNumber)
-      set({ review: result, reviewing: false, currentStageIndex: PIPELINE_STAGES.length - 1 })
+      set({
+        review: result,
+        reviewing: false,
+        currentStageIndex: PIPELINE_STAGES.length - 1,
+      })
     } catch (err) {
       set({
         reviewError: err instanceof Error ? err.message : String(err),
@@ -187,8 +202,15 @@ export const useReviewStore = create<ReviewState>((set, get) => ({
     startStageProgression(set)
 
     try {
-      const result = await requestAiReview(reviewTarget.repoName, reviewTarget.prNumber)
-      set({ review: result, reviewing: false, currentStageIndex: PIPELINE_STAGES.length - 1 })
+      const result = await requestAiReview(
+        reviewTarget.repoName,
+        reviewTarget.prNumber,
+      )
+      set({
+        review: result,
+        reviewing: false,
+        currentStageIndex: PIPELINE_STAGES.length - 1,
+      })
     } catch (err) {
       set({
         reviewError: err instanceof Error ? err.message : String(err),
@@ -212,4 +234,3 @@ export const useReviewStore = create<ReviewState>((set, get) => ({
     })
   },
 }))
-

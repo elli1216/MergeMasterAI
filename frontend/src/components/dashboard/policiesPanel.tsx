@@ -130,13 +130,16 @@ export function PoliciesPanel({ showHero = false }: PoliciesPanelProps) {
     }
 
     cancelForm()
+    cancelForm()
   }
 
   const startEdit = (policy: PolicyItem) => {
     startEditStore(policy)
+    startEditStore(policy)
   }
 
   const handleCancelAdd = () => {
+    cancelForm()
     cancelForm()
   }
 
@@ -418,24 +421,24 @@ export function PoliciesPanel({ showHero = false }: PoliciesPanelProps) {
 
       {/* POLICIES TABLE */}
       <Card className="bg-zinc-950 border-zinc-800 rounded-none shadow-none overflow-x-auto">
-        <CardContent className="p-0 min-w-[650px]">
+        <CardContent className="p-0 min-w-162.5">
           {filteredPolicies.length > 0 ? (
             <Table>
               <TableHeader className="bg-zinc-900 border-b border-zinc-800">
                 <TableRow className="border-none hover:bg-transparent">
-                  <TableHead className="text-zinc-400 font-mono text-xs uppercase tracking-wider py-4 w-[90px]">
+                  <TableHead className="text-zinc-400 font-mono text-xs uppercase tracking-wider py-4 w-22.5">
                     Status
                   </TableHead>
-                  <TableHead className="text-zinc-400 font-mono text-xs uppercase tracking-wider py-4 w-[220px]">
+                  <TableHead className="text-zinc-400 font-mono text-xs uppercase tracking-wider py-4 w-55">
                     Policy Name
                   </TableHead>
-                  <TableHead className="text-zinc-400 font-mono text-xs uppercase tracking-wider py-4 w-[110px]">
+                  <TableHead className="text-zinc-400 font-mono text-xs uppercase tracking-wider py-4 w-27.5">
                     Severity
                   </TableHead>
                   <TableHead className="text-zinc-400 font-mono text-xs uppercase tracking-wider py-4">
                     AI Constraint Description
                   </TableHead>
-                  <TableHead className="text-right text-zinc-400 font-mono text-xs uppercase tracking-wider py-4 w-[100px]">
+                  <TableHead className="text-right text-zinc-400 font-mono text-xs uppercase tracking-wider py-4 w-25">
                     Actions
                   </TableHead>
                 </TableRow>
