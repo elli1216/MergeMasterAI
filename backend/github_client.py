@@ -72,41 +72,115 @@ def get_installation_token(owner: str) -> str | None:
     return token
 
 
+def invalidate_cached_token(owner: str) -> None:
+    """Invalidate any cached installation token for this owner."""
+    _token_cache.pop(owner.lower(), None)
+
+
+def get_candidate_tokens(owner: str, user_token: str | None = None) -> list[str]:
+    """Return an ordered list of viable GitHub tokens for this owner.
+    
+    Priority:
+    1. User-supplied OAuth / PAT token (if non-empty)
+    2. GitHub App installation token (for the owner organization/user)
+    3. Server-wide GITHUB_TOKEN / GH_TOKEN environment variable
+    """
+    candidates: list[str] = []
+    if user_token and user_token.strip():
+        candidates.append(user_token.strip())
+
+    app_token = get_installation_token(owner)
+    if app_token and app_token not in candidates:
+        candidates.append(app_token)
+
+    env_token = getattr(config, "GITHUB_TOKEN", None)
+    if env_token and env_token.strip() and env_token.strip() not in candidates:
+        candidates.append(env_token.strip())
+
+    return candidates
+
+
 def fetch_pr_diff(
     owner: str, repo: str, pr_number: int, token: str | None = None
 ) -> dict | None:
-    """Fetch PR diff/file list/head info.
-
-    `token` is an optional user-provided OAuth token (used when the GitHub App
-    is not installed on the repo); otherwise an App installation token is used.
-    """
-    if token:
-        gh = Github(token)
-    else:
-        token = get_installation_token(owner)
-        if not token:
-            return None
-        gh = Github(token)
-    try:
-        pr = gh.get_repo(f"{owner}/{repo}").get_pull(pr_number)
-        files = list(pr.get_files())
-    except Exception as exc:
+    """Fetch PR diff/file list/head info with multi-token fallback."""
+    candidate_tokens = get_candidate_tokens(owner, token)
+    if not candidate_tokens:
         logger.warning(
-            "failed to fetch PR files for %s/%s #%s: %s", owner, repo, pr_number, exc
+            "no GitHub token or GitHub App credentials found for owner '%s'", owner
         )
         return None
-    diff = "\n".join(
-        f"--- {f.filename}\n+++ {f.filename} ({f.status})\n{f.patch or ''}" for f in files
+
+    last_error = None
+    for cand_token in candidate_tokens:
+        try:
+            gh = Github(cand_token)
+            pr = gh.get_repo(f"{owner}/{repo}").get_pull(pr_number)
+            files = list(pr.get_files())
+            diff = "\n".join(
+                f"--- {f.filename}\n+++ {f.filename} ({f.status})\n{f.patch or ''}"
+                for f in files
+            )
+            return {
+                "diff": diff,
+                "files": [f.filename for f in files],
+                "head_sha": pr.head.sha,
+                "head_ref": pr.head.ref,
+                "title": pr.title,
+                "author": pr.user.login if pr.user else "",
+                "mergeable": pr.mergeable,
+            }
+        except Exception as exc:
+            last_error = exc
+            err_msg = str(exc)
+            if "401" in err_msg or "Bad credentials" in err_msg or "403" in err_msg:
+                invalidate_cached_token(owner)
+                logger.warning(
+                    "GitHub credential rejected (%s) for %s/%s #%s; trying fallback token...",
+                    err_msg[:120],
+                    owner,
+                    repo,
+                    pr_number,
+                )
+            else:
+                logger.warning(
+                    "failed to fetch PR files with token for %s/%s #%s: %s",
+                    owner,
+                    repo,
+                    pr_number,
+                    err_msg[:120],
+                )
+
+    logger.warning(
+        "all candidate tokens failed for %s/%s #%s. Last error: %s",
+        owner,
+        repo,
+        pr_number,
+        last_error,
     )
-    return {
-        "diff": diff,
-        "files": [f.filename for f in files],
-        "head_sha": pr.head.sha,
-        "head_ref": pr.head.ref,
-        "title": pr.title,
-        "author": pr.user.login if pr.user else "",
-        "mergeable": pr.mergeable,
-    }
+    return None
+
+
+def get_authenticated_repo(repo_name: str, user_token: str | None = None):
+    """Return an authenticated (Github, Repository) pair trying candidate tokens in order."""
+    owner, _ = repo_name.split("/", 1)
+    candidates = get_candidate_tokens(owner, user_token)
+    for token in candidates:
+        try:
+            gh = Github(token)
+            repo = gh.get_repo(repo_name)
+            _ = repo.name
+            return gh, repo
+        except Exception as exc:
+            err_msg = str(exc)
+            if "401" in err_msg or "Bad credentials" in err_msg or "403" in err_msg:
+                invalidate_cached_token(owner)
+            logger.warning(
+                "token candidate failed accessing %s: %s; trying next candidate...",
+                repo_name,
+                err_msg[:120],
+            )
+    return None, None
 
 
 def enforce_gate(
@@ -122,13 +196,10 @@ def enforce_gate(
     reviewers: list | None = None,
 ) -> None:
     """Set the GitHub commit status gate, post/update PR sticky review comments, and manage blocker issues."""
-    owner, repo = repo_name.split("/", 1)
-    token = github_token or get_installation_token(owner) or getattr(config, "GITHUB_TOKEN", None)
-    if not token:
-        logger.info("no GitHub token or GitHub App access; skipping commit-status gate enforcement")
+    gh, gh_repo = get_authenticated_repo(repo_name, github_token)
+    if not gh or not gh_repo:
+        logger.info("no working GitHub token or GitHub App access for %s; skipping gate enforcement", repo_name)
         return
-    gh = Github(token)
-    gh_repo = gh.get_repo(repo_name)
 
     # 1. Commit Status Check
     gate_state = {

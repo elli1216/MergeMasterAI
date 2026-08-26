@@ -32,7 +32,14 @@ async def extract_diff(state: PipelineState) -> PipelineState:
     except Exception as exc:
         return {**state, "error": f"diff extraction failed: {exc}"}
     if not data:
-        return {**state, "error": "diff extraction failed: no GitHub credentials or installation found"}
+        return {
+            **state,
+            "error": (
+                "diff extraction failed: unable to access repository on GitHub. "
+                "The GitHub OAuth token or credentials may have expired (401 Bad credentials), "
+                "or the GitHub App is not installed for this repository. Please re-login to refresh your GitHub token or verify permissions."
+            ),
+        }
     merged = {
         **state,
         "diff": data["diff"],

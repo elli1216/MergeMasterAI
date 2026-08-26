@@ -104,14 +104,11 @@ def push_test_commit(
     github_token: str | None = None,
 ) -> tuple[str | None, str]:
     """Push the generated unit test file as a commit to the PR branch."""
-    owner, _ = repo_name.split("/", 1)
-    token = github_token or github_client.get_installation_token(owner)
-    if not token:
-        return None, "No GitHub App credentials or user token available."
+    _, repo = github_client.get_authenticated_repo(repo_name, github_token)
+    if not repo:
+        return None, "No valid GitHub App credentials or user token available."
 
     try:
-        gh = Github(token)
-        repo = gh.get_repo(repo_name)
 
         # Check if file already exists on the branch
         sha = None

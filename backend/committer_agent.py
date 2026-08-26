@@ -134,13 +134,10 @@ def apply_fixes(
     github_token: str | None = None,
 ) -> tuple[str | None, int]:
     """Push one commit per fix to the PR branch. Returns (new head sha, applied count)."""
-    owner, _ = repo_name.split("/", 1)
-    token = github_token or github_client.get_installation_token(owner) or getattr(config, "GITHUB_TOKEN", None)
-    if not token:
-        logger.info("no GitHub token or GitHub App access; cannot push remediation commit")
+    _, repo = github_client.get_authenticated_repo(repo_name, github_token)
+    if not repo:
+        logger.info("no working GitHub token or GitHub App access; cannot push remediation commit")
         return None, 0
-    gh = Github(token)
-    repo = gh.get_repo(repo_name)
     applied = 0
     current_sha = head_sha
     for fix in fixes:
