@@ -82,9 +82,11 @@ async def _scheduled_pipeline(**kwargs) -> None:
 
 
 @app.get("/")
+@app.get("/api")
 @app.get("/healthz")
+@app.get("/api/healthz")
 async def health_check():
-    """Health check endpoint for Render, Docker, and status monitors."""
+    """Health check endpoint for Render, Vercel, Docker, and status monitors."""
     return {
         "status": "healthy",
         "service": "mergemaster-ai-backend",
@@ -93,12 +95,15 @@ async def health_check():
 
 
 @app.get("/ping")
+@app.get("/api/ping")
 @app.head("/ping")
+@app.head("/api/ping")
 async def ping():
     """Keep-alive endpoint for cron jobs and uptime monitors to prevent cold starts."""
     return {"status": "pong"}
 
 
+@app.post("/webhooks/github")
 @app.post("/api/webhooks/github")
 async def github_webhook(request: Request, background_tasks: BackgroundTasks):
     """
@@ -228,6 +233,7 @@ async def github_webhook(request: Request, background_tasks: BackgroundTasks):
     return {"status": "success"}
 
 
+@app.post("/reviews")
 @app.post("/api/reviews")
 async def run_review(request: Request):
     """
@@ -264,6 +270,7 @@ async def run_review(request: Request):
     }
 
 
+@app.post("/chat")
 @app.post("/api/chat")
 async def chat_about_pr(request: Request):
     """
@@ -318,6 +325,7 @@ async def chat_about_pr(request: Request):
         return {"answer": f"Unable to generate response: {exc}"}
 
 
+@app.post("/generate-tests")
 @app.post("/api/generate-tests")
 async def generate_pr_tests(request: Request):
     """
@@ -359,6 +367,7 @@ async def generate_pr_tests(request: Request):
     return tests.model_dump()
 
 
+@app.post("/push-tests")
 @app.post("/api/push-tests")
 async def push_pr_tests(request: Request):
     """
