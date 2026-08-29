@@ -91,7 +91,7 @@ This guide details the complete production deployment setup for **MergeMaster AI
    | `GEMINI_API_KEY` | Your LLM API Key (IBM watsonx.ai / Granite) |
    | `LLM_API_BASE` | `https://generativelanguage.googleapis.com/v1beta/openai` |
    | `LLM_MODEL` | `gemini-3.5-flash-lite` |
-   | `CORS_ORIGINS` | `https://<your-vercel-app>.vercel.app,http://localhost:3000` |
+   | `CORS_ORIGINS` | `https://merge-master-ai.vercel.app,http://localhost:3000` |
 
 6. Click **Create Web Service**.
 

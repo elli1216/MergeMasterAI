@@ -25,19 +25,21 @@ load_dotenv()
 
 app = FastAPI(title="MergeMaster AI Backend", version="1.0.0")
 
-# Allow the frontend dashboard to call the API endpoints.
+# Allow only the official frontend dashboard and local development origins
 CORS_ORIGINS = [
     origin.strip()
     for origin in os.getenv(
-        "CORS_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000,https://*.vercel.app"
+        "CORS_ORIGINS",
+        "https://merge-master-ai.vercel.app,http://localhost:3000,http://127.0.0.1:3000",
     ).split(",")
     if origin.strip()
 ]
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=CORS_ORIGINS,
-    allow_origin_regex=r"https://.*\.vercel\.app",
-    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_credentials=True,
+    allow_methods=["*"],
     allow_headers=["*"],
 )
 
